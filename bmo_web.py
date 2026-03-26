@@ -636,6 +636,48 @@ HTML = """<!DOCTYPE html>
     font-size: 14px;
     padding: 28px 0;
   }
+
+  /* ── TIMER BAR ── */
+  #timerBar {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #1a2e1a;
+    border-bottom: 1px solid #2d5a2d;
+    flex-shrink: 0;
+  }
+  #timerBar.active { display: flex; }
+  .timer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #0f2010;
+    border: 1px solid #2d5a2d;
+    border-radius: 10px;
+    padding: 8px 12px;
+    animation: fadeIn .3s ease;
+  }
+  .timer-item .timer-icon { font-size: 18px; flex-shrink: 0; }
+  .timer-item .timer-label { flex: 1; font-size: 13px; color: var(--text2); }
+  .timer-item .timer-countdown {
+    font-size: 20px;
+    font-weight: 700;
+    color: #4ade80;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+  }
+  .timer-item .timer-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: #4ade80;
+    border-radius: 0 0 10px 10px;
+    transition: width 1s linear;
+  }
+  .timer-item { position: relative; overflow: hidden; }
+  .timer-item.ending .timer-countdown { color: #f97316; }
+  .timer-item.critical .timer-countdown { color: #ef4444; animation: pulse .6s infinite; }
 </style>
 </head>
 <body>
@@ -673,6 +715,9 @@ HTML = """<!DOCTYPE html>
       <span class="icon">🗑️</span>Reset
     </button>
   </div>
+
+  <!-- TIMER BAR -->
+  <div id="timerBar"></div>
 
   <!-- CHAT -->
   <div class="chat" id="chat">
@@ -849,6 +894,59 @@ async function updateStatus() {
 }
 updateStatus();
 setInterval(updateStatus, 5000);
+
+// ── TIMER ────────────────────────────────────────────────────────
+let _knownTimers = {};  // id → {label, duration} für Abschluss-Erkennung
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0
+    ? m + ':' + String(s).padStart(2, '0')
+    : s + 's';
+}
+
+async function pollTimers() {
+  try {
+    const r = await fetch('/api/timers');
+    const d = await r.json();
+    const timers = d.timers || [];
+    const bar    = document.getElementById('timerBar');
+
+    // Abgelaufene Timer erkennen (waren in _knownTimers, fehlen jetzt)
+    const currentIds = new Set(timers.map(t => t.id));
+    for (const [id, info] of Object.entries(_knownTimers)) {
+      if (!currentIds.has(parseInt(id))) {
+        addMsg(`⏰ Timer abgelaufen: ${info.label}`, 'sys');
+        delete _knownTimers[id];
+      }
+    }
+
+    // Aktuelle Timer merken
+    timers.forEach(t => { _knownTimers[t.id] = {label: t.label, duration: t.duration}; });
+
+    if (!timers.length) {
+      bar.classList.remove('active');
+      bar.innerHTML = '';
+      return;
+    }
+
+    bar.classList.add('active');
+    bar.innerHTML = timers.map(t => {
+      const pct   = Math.round((t.remaining / t.duration) * 100);
+      const cls   = t.remaining <= 10 ? 'critical' : t.remaining <= 30 ? 'ending' : '';
+      return `<div class="timer-item ${cls}">
+        <span class="timer-icon">⏱️</span>
+        <span class="timer-label">${t.label}</span>
+        <span class="timer-countdown">${fmtTime(t.remaining)}</span>
+        <div class="timer-progress" style="width:${pct}%"></div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+pollTimers();
+setInterval(pollTimers, 1000);
 
 // ── CHAT-VERLAUF LADEN ───────────────────────────────────────────
 async function loadChatHistory() {
@@ -1362,6 +1460,15 @@ def spotify_current_proxy():
         return jsonify(r.json())
     except Exception as e:
         return jsonify(track=None, artist=None, playing=False)
+
+@app.route('/api/timers', methods=['GET'])
+@login_required
+def timers_proxy():
+    try:
+        r = req.get(f"{CORE_URL}/timers", timeout=3)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify(timers=[])
 
 @app.route('/api/spotify/volume', methods=['GET', 'POST'])
 @login_required

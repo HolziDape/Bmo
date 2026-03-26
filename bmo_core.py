@@ -161,6 +161,10 @@ WITZE = [
 # ── GESPRÄCHSVERLAUF (In-Memory Ollama-Kontext) ────────────────────────────
 _conversation_history = []
 
+# ── AKTIVE TIMER ────────────────────────────────────────────────────────────
+_active_timers = []
+_timer_lock    = threading.Lock()
+
 # ── LAZY LOADING ───────────────────────────────────────────────────────────
 # Module werden erst beim ersten Aufruf geladen → Core startet sofort schnell
 
@@ -381,9 +385,21 @@ def spotify_volume_down():
 # ── TIMER ──────────────────────────────────────────────────────────────────
 
 def set_timer(minutes: float, label: str = ""):
-    display = f"{label} ({minutes} Min.)" if label else f"{minutes} Min."
+    display   = f"{label} ({minutes} Min.)" if label else f"{minutes} Min."
+    timer_id  = int(time.time() * 1000)
+    entry = {
+        'id':       timer_id,
+        'label':    label or f"{minutes} Min.",
+        'start':    time.time(),
+        'duration': minutes * 60,
+    }
+    with _timer_lock:
+        _active_timers.append(entry)
+
     def callback():
         log.info(f"Timer '{display}' abgelaufen.")
+        with _timer_lock:
+            _active_timers[:] = [t for t in _active_timers if t['id'] != timer_id]
         try:
             import pygame
             pygame.mixer.init()
@@ -397,6 +413,7 @@ def set_timer(minutes: float, label: str = ""):
                         return
         except Exception as e:
             log.warning(f"Timer-Sound Fehler: {e}")
+
     t = threading.Timer(minutes * 60, callback)
     t.daemon = True
     t.start()
@@ -854,6 +871,24 @@ def route_history_clear():
     _conversation_history = []
     log.info("Gesprächskontext gelöscht.")
     return jsonify(status="ok")
+
+
+@app.route('/timers', methods=['GET'])
+def route_timers():
+    """Gibt alle aktiven Timer mit verbleibender Zeit zurück."""
+    now = time.time()
+    with _timer_lock:
+        result = []
+        for t in _active_timers:
+            remaining = t['duration'] - (now - t['start'])
+            if remaining > 0:
+                result.append({
+                    'id':        t['id'],
+                    'label':     t['label'],
+                    'remaining': int(remaining),
+                    'duration':  int(t['duration']),
+                })
+    return jsonify(timers=result)
 
 
 @app.route('/ping', methods=['GET'])
