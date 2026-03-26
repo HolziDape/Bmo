@@ -1,0 +1,80 @@
+============================================================
+  BMO - Anleitung fuer den Freund
+============================================================
+
+Hallo! Hier ist alles was du brauchst um BMO zu nutzen.
+Dein Freund laeuft den "Kern" von BMO auf seinem PC -
+du verbindest dich einfach damit.
+
+------------------------------------------------------------
+  SCHRITT 1: Python installieren (einmalig)
+------------------------------------------------------------
+
+1. Geh auf: https://www.python.org/downloads/
+2. Klick auf den grossen gelben "Download"-Button
+3. Starte die heruntergeladene Datei
+4. WICHTIG: Haken setzen bei "Add Python to PATH"
+   (ganz unten im Installer!)
+5. Dann auf "Install Now" klicken
+6. Fertig!
+
+------------------------------------------------------------
+  SCHRITT 2: IP-Adresse eintragen (einmalig)
+------------------------------------------------------------
+
+1. Frag deinen Freund nach seiner Tailscale-IP-Adresse
+   (sieht so aus: 100.xx.xx.xx)
+2. Oeffne die Datei "config.txt" (Doppelklick)
+3. Ersetze "HIER_IP_EINTRAGEN" durch die IP-Adresse
+   Beispiel:  CORE_IP=100.64.0.1
+4. Speichern und schliessen (Strg+S, dann X)
+
+------------------------------------------------------------
+  SCHRITT 3: Pakete installieren (einmalig)
+------------------------------------------------------------
+
+Fuer die Web-Version (einfacher):
+  -> Doppelklick auf "SETUP_EINMALIG.bat"
+  -> Warten bis es fertig ist
+
+Fuer die Desktop-Version (mit Sprachsteuerung):
+  -> Doppelklick auf "SETUP_DESKTOP_EINMALIG.bat"
+  -> Warten bis es fertig ist (kann laenger dauern)
+
+------------------------------------------------------------
+  SCHRITT 4: BMO starten!
+------------------------------------------------------------
+
+Web-Version (im Browser):
+  -> Doppelklick auf "START_WEB.bat"
+  -> Browser oeffnet sich automatisch
+  -> Tippe BMO eine Nachricht oder nutze das Mikrofon (🎤)
+
+Desktop-Version (mit Gesicht und Sprachsteuerung):
+  -> Doppelklick auf "START_DESKTOP.bat"
+  -> Warte kurz bis das BMO-Gesicht erscheint
+  -> Sag laut "Hey BMO" um ihn aufzuwecken
+  -> Sprich dann mit ihm!
+
+------------------------------------------------------------
+  HINWEISE
+------------------------------------------------------------
+
+- Das schwarze Fenster (Konsole) NICHT schliessen!
+  Es laeuft im Hintergrund - einfach minimieren.
+
+- Falls BMO nicht antwortet:
+  -> Pruefe ob dein Freund seinen PC und bmo_core.py laufen hat
+  -> Pruefe ob die IP in config.txt stimmt
+
+- Web-Version: Adresse im Browser ist http://localhost:5000
+
+- Desktop-Version benoetigt ein Mikrofon!
+
+------------------------------------------------------------
+  BEI PROBLEMEN
+------------------------------------------------------------
+
+Schreib deinem Freund - er kann dir helfen. :)
+
+============================================================

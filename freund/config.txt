@@ -1,0 +1,33 @@
+# ============================================================
+#   BMO - Verbindungs- und Spotify-Einstellungen
+# ============================================================
+#
+#  SCHRITT 1: Tailscale-IP von deinem Freund eintragen
+#
+#  Beispiel:  CORE_IP=100.64.0.1
+#
+CORE_IP=HIER_IP_EINTRAGEN
+CORE_PORT=6000
+
+
+# ============================================================
+#  SCHRITT 2: Dein eigenes Spotify einrichten
+#  (nur nötig wenn du Spotify nutzen willst)
+#
+#  So bekommst du deine Zugangsdaten:
+#  1. Geh auf https://developer.spotify.com/dashboard
+#  2. Logge dich mit deinem Spotify-Account ein
+#  3. Klick auf "Create App"
+#  4. Name: "BMO", Redirect URI: http://127.0.0.1:8888/callback
+#  5. Kopiere Client ID und Client Secret hierher
+#
+# ============================================================
+
+SPOTIFY_CLIENT_ID=HIER_CLIENT_ID_EINTRAGEN
+SPOTIFY_CLIENT_SECRET=HIER_CLIENT_SECRET_EINTRAGEN
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
+
+# Deine Lieblings-Playlist ID (aus dem Spotify-Link)
+# Beispiel: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+#                                                  ^^^^^^^^^^^^^^^^^^^^^ <- das ist die ID
+SPOTIFY_PLAYLIST_ID=HIER_PLAYLIST_ID_EINTRAGEN
