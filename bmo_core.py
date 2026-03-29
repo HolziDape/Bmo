@@ -161,6 +161,10 @@ WITZE = [
 # ── GESPRÄCHSVERLAUF (In-Memory Ollama-Kontext) ────────────────────────────
 _conversation_history = []
 
+# ── AKTIVE TIMER ────────────────────────────────────────────────────────────
+_active_timers = []
+_timer_lock    = threading.Lock()
+
 # ── LAZY LOADING ───────────────────────────────────────────────────────────
 # Module werden erst beim ersten Aufruf geladen → Core startet sofort schnell
 
@@ -381,9 +385,21 @@ def spotify_volume_down():
 # ── TIMER ──────────────────────────────────────────────────────────────────
 
 def set_timer(minutes: float, label: str = ""):
-    display = f"{label} ({minutes} Min.)" if label else f"{minutes} Min."
+    display   = f"{label} ({minutes} Min.)" if label else f"{minutes} Min."
+    timer_id  = int(time.time() * 1000)
+    entry = {
+        'id':       timer_id,
+        'label':    label or f"{minutes} Min.",
+        'start':    time.time(),
+        'duration': minutes * 60,
+    }
+    with _timer_lock:
+        _active_timers.append(entry)
+
     def callback():
         log.info(f"Timer '{display}' abgelaufen.")
+        with _timer_lock:
+            _active_timers[:] = [t for t in _active_timers if t['id'] != timer_id]
         try:
             import pygame
             pygame.mixer.init()
@@ -397,6 +413,7 @@ def set_timer(minutes: float, label: str = ""):
                         return
         except Exception as e:
             log.warning(f"Timer-Sound Fehler: {e}")
+
     t = threading.Timer(minutes * 60, callback)
     t.daemon = True
     t.start()
@@ -724,6 +741,7 @@ def route_status():
 
     # GPU via wmi (AMD-kompatibel)
     gpu_load = None
+    gpu_mem  = None   # FIX: immer initialisieren, sonst UnboundLocalError
     try:
         import wmi
         w = wmi.WMI(namespace="root\OpenHardwareMonitor")
@@ -771,10 +789,13 @@ def route_spotify_current():
     try:
         pb = sp.current_playback()
         if pb and pb.get('item'):
+            images = pb['item'].get('album', {}).get('images', [])
+            cover  = images[1]['url'] if len(images) > 1 else (images[0]['url'] if images else None)
             return jsonify(
                 track=pb['item']['name'],
                 artist=pb['item']['artists'][0]['name'],
-                playing=pb['is_playing']
+                playing=pb['is_playing'],
+                cover=cover
             )
     except:
         pass
@@ -856,6 +877,24 @@ def route_history_clear():
     return jsonify(status="ok")
 
 
+@app.route('/timers', methods=['GET'])
+def route_timers():
+    """Gibt alle aktiven Timer mit verbleibender Zeit zurück."""
+    now = time.time()
+    with _timer_lock:
+        result = []
+        for t in _active_timers:
+            remaining = t['duration'] - (now - t['start'])
+            if remaining > 0:
+                result.append({
+                    'id':        t['id'],
+                    'label':     t['label'],
+                    'remaining': int(remaining),
+                    'duration':  int(t['duration']),
+                })
+    return jsonify(timers=result)
+
+
 @app.route('/ping', methods=['GET'])
 def route_ping():
     """Lebenszeichen — Interfaces prüfen hiermit ob Core läuft."""
@@ -864,15 +903,6 @@ def route_ping():
 
 # ── START ───────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    print("\n🤖 BMO Core startet...")
-    print(f"   Port       : {PORT}")
-    print(f"   Modell     : {OLLAMA_MODEL}")
-    print(f"   Whisper    : {WHISPER_MODEL_SIZE}  (lazy – wird beim 1. Aufruf geladen)")
-    print(f"   TTS/RVC    : {RVC_MODEL}")
-    print(f"\n   Endpunkte  :")
-    print(f"   POST  /process     → Text → Antwort + action")
-    print(f"   POST  /transcribe  → Audio → Transkript + Antwort + action")
-    print(f"   POST  /speak       → Text → WAV (base64)")
-    print(f"   GET   /status      → CPU / RAM / Uhrzeit / Temp")
-    print(f"   GET   /ping        → Lebenszeichen\n")
+    log.info("BMO Core startet...")
+    log.info(f"Port: {PORT} | Modell: {OLLAMA_MODEL} | Whisper: {WHISPER_MODEL_SIZE}")
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
