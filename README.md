@@ -106,13 +106,9 @@ pip install spotipy
 > pip install flask flask-cors requests psutil feedparser pillow pygame sounddevice soundfile speechrecognition openwakeword spotipy
 > ```
 
-### Schritt 4 · Modelle herunterladen
+### Schritt 4 · Modelle
 
-Die Modell-Dateien sind zu groß für Git und liegen als **GitHub Release** bereit:
-
-**👉 [Modelle herunterladen (GitHub Releases)](https://github.com/HolziDape/Bmo-fr/releases/latest)**
-
-Die Dateien herunterladen und in den `models/`-Ordner legen:
+Die Modell-Dateien sind bereits im Repo enthalten und werden beim Klonen automatisch mitgeladen:
 
 | Datei | Beschreibung |
 |---|---|
