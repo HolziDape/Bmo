@@ -127,7 +127,7 @@ Die Modell-Dateien sind bereits im Repo enthalten und werden beim Klonen automat
 
 `bmo_start.bat` startet den Watchdog, der Core und Web automatisch überwacht und bei Absturz neu startet.
 
-> 💡 **Erster Start:** Beim allerersten Start von `bmo_web.py` wirst du im Terminal nach einem Login-Passwort gefragt. Es wird in `bmo_config.txt` gespeichert und danach nie wieder abgefragt.
+> 💡 **Erster Start:** Beim allerersten Start öffnet sich automatisch `http://localhost:5000/setup` im Browser — dort kannst du dein Login-Passwort direkt im Web-Interface setzen. Es wird in `bmo_config.txt` gespeichert und danach nie wieder abgefragt.
 
 **Oder manuell:**
 ```bash
@@ -155,7 +155,7 @@ python bmo_desktop.py
 
 ### bmo_web.py
 
-Das Passwort wird beim ersten Start interaktiv gesetzt und in `bmo_config.txt` gespeichert.
+Das Passwort wird beim ersten Start über die Setup-Seite im Browser gesetzt (`/setup`) und in `bmo_config.txt` gespeichert.
 Willst du es nachträglich ändern, einfach `bmo_config.txt` öffnen und die Zeile anpassen:
 ```
 WEB_PASSWORD=deinNeuesPasswort
