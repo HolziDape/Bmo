@@ -1123,7 +1123,7 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showScreen()" style="border-color:#0ea5e9;color:#38bdf8;">
       <span class="icon">🖥️</span>Screen
     </button>
-    <div id="friendBtns"></div>
+    <div id="friendBtns" style="display:contents;"></div>
     <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
       <span class="icon">⚙️</span>Settings
     </button>
