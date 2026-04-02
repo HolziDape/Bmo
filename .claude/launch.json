@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "BMO Core",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["bmo_core.py"],
+      "port": 6000
+    },
+    {
+      "name": "BMO Web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["bmo_web.py"],
+      "port": 5000
+    },
+    {
+      "name": "BMO Desktop",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["bmo_desktop.py"],
+      "port": 0
+    }
+  ]
+}

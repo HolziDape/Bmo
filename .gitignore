@@ -7,9 +7,9 @@ freund/.spotify_cache
 .spotify_cache
 
 # Logs & Runtime
-logs/
+_intern/logs/
 *.log
-data/conversations.json
+_intern/data/conversations.json
 
 # Python cache
 __pycache__/

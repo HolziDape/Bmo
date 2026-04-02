@@ -49,7 +49,8 @@ else:
 
 CORE_URL        = "http://localhost:6000"
 
-WAKE_WORD_MODEL = os.path.join("models", "hey_bmo.onnx")
+_BASE_DIR       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WAKE_WORD_MODEL = os.path.join(_BASE_DIR, "_intern", "models", "hey_bmo.onnx")
 
 VOICE_VOLUME    = 0.2   # Lautstärke der BMO-Stimme (0.0 = stumm, 1.0 = max)
 SOUNDS_VOLUME   = 0.2   # Lautstärke der vorgenerierten Sound-Lines
@@ -71,7 +72,7 @@ LISTEN_TIMEOUT  = 4
 PAUSE_THRESHOLD = 1.5
 
 # Sound-Verzeichnisse
-SOUNDS_BASE  = os.path.join("assets", "sounds")
+SOUNDS_BASE  = os.path.join(_BASE_DIR, "assets", "sounds")
 BOOT_DIR     = os.path.join(SOUNDS_BASE, "boot")
 DENKEN_DIR   = os.path.join(SOUNDS_BASE, "denken")
 HEYBMO_DIR   = os.path.join(SOUNDS_BASE, "heybmo")
@@ -79,7 +80,7 @@ REPLY_DIR    = os.path.join(SOUNDS_BASE, "reply")
 SHUTDOWN_DIR = os.path.join(SOUNDS_BASE, "shutdown")
 
 # Bilder-Verzeichnisse
-FACES_BASE = os.path.join("assets", "faces")
+FACES_BASE = os.path.join(_BASE_DIR, "assets", "faces")
 FACE_DIRS  = {
     "BOOT":   os.path.join(FACES_BASE, "boot"),
     "IDLE":   os.path.join(FACES_BASE, "idle"),
