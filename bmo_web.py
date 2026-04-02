@@ -1965,10 +1965,10 @@ def manifest():
 @login_required
 def status():
     try:
-        r = req.get(f"{CORE_URL}/status", timeout=2)
+        r = req.get(f"{CORE_URL}/status", timeout=(3, 5))
         return jsonify(r.json())
     except:
-        cpu  = psutil.cpu_percent(interval=0.5)
+        cpu  = psutil.cpu_percent()
         ram  = psutil.virtual_memory().percent
         time = datetime.datetime.now().strftime('%H:%M')
         return jsonify(cpu=cpu, ram=ram, time=time, gpu=None)
@@ -2144,20 +2144,25 @@ def commands_list():
 
 # ── SCREEN STREAMING ──────────────────────────────────────────────
 _latest_frame: bytes | None = None
-_frame_lock = threading.Lock()
+_frame_lock    = threading.Lock()
+_capture_active = False
+_screen_viewers = 0
+_viewers_lock   = threading.Lock()
 
 def _capture_daemon():
-    """Hintergrund-Thread: erfasst Desktop so schnell wie möglich (~15 FPS) mit mss."""
-    global _latest_frame
+    """Hintergrund-Thread: läuft nur solange jemand den Screen anschaut."""
+    global _latest_frame, _capture_active
     target_interval = 1.0 / 15
-    if _SCREEN_BACKEND == 'mss':
-        sct = _mss_lib.mss()
+    sct = _mss_lib.mss() if _SCREEN_BACKEND == 'mss' else None
     while True:
+        with _viewers_lock:
+            if _screen_viewers == 0:
+                _capture_active = False
+                break
         t0 = _time.monotonic()
         try:
             if _SCREEN_BACKEND == 'mss':
-                monitor = sct.monitors[0]
-                raw = sct.grab(monitor)
+                raw = sct.grab(sct.monitors[0])
                 img = _PilImage.frombytes('RGB', raw.size, raw.bgra, 'raw', 'BGRX')
             else:
                 img = ImageGrab.grab()
@@ -2176,18 +2181,32 @@ def _capture_daemon():
         wait = target_interval - elapsed
         if wait > 0:
             _time.sleep(wait)
+    if sct:
+        sct.close()
 
-if _SCREEN_OK:
-    threading.Thread(target=_capture_daemon, daemon=True).start()
+def _ensure_capture_running():
+    global _capture_active
+    with _viewers_lock:
+        if not _capture_active and _SCREEN_OK:
+            _capture_active = True
+            threading.Thread(target=_capture_daemon, daemon=True).start()
 
 def _screen_generator():
-    """MJPEG-Generator: liefert den zuletzt erfassten Frame mit ~15 FPS."""
-    while True:
-        with _frame_lock:
-            frame = _latest_frame
-        if frame:
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        _time.sleep(0.067)
+    """MJPEG-Generator: startet Capture beim ersten Zuschauer, stoppt wenn keiner mehr schaut."""
+    global _screen_viewers
+    with _viewers_lock:
+        _screen_viewers += 1
+    _ensure_capture_running()
+    try:
+        while True:
+            with _frame_lock:
+                frame = _latest_frame
+            if frame:
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            _time.sleep(0.067)
+    finally:
+        with _viewers_lock:
+            _screen_viewers = max(0, _screen_viewers - 1)
 
 @app.route('/api/screen')
 @login_required
