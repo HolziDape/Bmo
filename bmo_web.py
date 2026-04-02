@@ -1123,6 +1123,9 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showScreen()" style="border-color:#0ea5e9;color:#38bdf8;">
       <span class="icon">🖥️</span>Screen
     </button>
+    <button id="allScareBtn" class="qbtn friend" onclick="scareAll()" style="display:none;">
+      <span class="icon">👻</span>Alle Scare
+    </button>
     <div id="friendBtns" style="display:contents;"></div>
     <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
       <span class="icon">⚙️</span>Settings
@@ -1527,12 +1530,9 @@ async function loadFriends() {
 function renderFriendButtons() {
   const container = document.getElementById('friendBtns');
   container.innerHTML = '';
+  const allBtn = document.getElementById('allScareBtn');
+  allBtn.style.display = _friends.length ? '' : 'none';
   _friends.forEach(f => {
-    const s = document.createElement('button');
-    s.className = 'qbtn friend';
-    s.innerHTML = `<span class="icon">👻</span>${f.name}`;
-    s.onclick = () => triggerFriendJumpscare(f.idx, f.name);
-    container.appendChild(s);
     const sc = document.createElement('button');
     sc.className = 'qbtn friend';
     sc.innerHTML = `<span class="icon">🖥️</span>${f.name}`;
@@ -1549,6 +1549,12 @@ async function triggerFriendJumpscare(idx, name) {
   } catch(e) {
     addMsg(`${name} nicht erreichbar 😢`, 'sys');
   }
+}
+
+async function scareAll() {
+  if (!_friends.length) return;
+  addMsg('👻 Scare an alle Freunde...', 'sys');
+  await Promise.all(_friends.map(f => triggerFriendJumpscare(f.idx, f.name)));
 }
 
 let _friendScreenActive = false;
