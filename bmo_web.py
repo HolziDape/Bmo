@@ -1315,6 +1315,7 @@ HTML = """<!DOCTYPE html>
         </button>
       </div>
     </div>
+    <div id="monitorPicker" style="display:flex;gap:6px;padding:6px 0 2px;flex-wrap:wrap;"></div>
     <img id="screenImg" src="" alt="Bildschirm wird geladen..." ondblclick="toggleFullscreen('screenImg')">
   </div>
 </div>
@@ -1491,16 +1492,40 @@ function runCommand(msg) {
 // ── SCREEN OVERLAY ───────────────────────────────────────────────
 let _screenActive = false;
 
-function showScreen() {
+async function showScreen() {
   _screenActive = true;
   document.getElementById('screenOverlay').classList.add('show');
   document.getElementById('screenImg').src = '/api/screen?' + Date.now();
+  await loadMonitorPicker();
+}
+
+async function loadMonitorPicker() {
+  try {
+    const r = await fetch('/api/screen/monitors');
+    const d = await r.json();
+    const picker = document.getElementById('monitorPicker');
+    picker.innerHTML = '';
+    d.monitors.forEach(m => {
+      const btn = document.createElement('button');
+      btn.textContent = m.label;
+      btn.dataset.idx = m.idx;
+      btn.style.cssText = 'padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid ' +
+        (m.idx === d.active ? '#38bdf8;background:#0ea5e9;color:#fff;font-weight:600;' : '#334155;background:none;color:#94a3b8;');
+      btn.onclick = () => selectMonitor(m.idx);
+      picker.appendChild(btn);
+    });
+  } catch(e) {}
+}
+
+async function selectMonitor(idx) {
+  await fetch('/api/screen/monitor', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({idx})});
+  document.getElementById('screenImg').src = '/api/screen?' + Date.now();
+  await loadMonitorPicker();
 }
 
 function closeScreen() {
   _screenActive = false;
   document.getElementById('screenOverlay').classList.remove('show');
-  // src leeren stoppt den MJPEG-Stream (spart Bandbreite)
   setTimeout(() => {
     if (!_screenActive) document.getElementById('screenImg').src = '';
   }, 300);
@@ -2242,10 +2267,12 @@ def commands_list():
 
 # ── SCREEN STREAMING ──────────────────────────────────────────────
 _latest_frame: bytes | None = None
-_frame_lock    = threading.Lock()
+_frame_lock     = threading.Lock()
 _capture_active = False
 _screen_viewers = 0
 _viewers_lock   = threading.Lock()
+_selected_monitor = 1  # 1 = erster echter Monitor (mss: 0 = alle zusammen)
+_monitor_lock   = threading.Lock()
 
 def _capture_daemon():
     """Hintergrund-Thread: läuft nur solange jemand den Screen anschaut."""
@@ -2260,7 +2287,11 @@ def _capture_daemon():
         t0 = _time.monotonic()
         try:
             if _SCREEN_BACKEND == 'mss':
-                raw = sct.grab(sct.monitors[0])
+                with _monitor_lock:
+                    mon_idx = _selected_monitor
+                monitors = sct.monitors
+                mon = monitors[mon_idx] if mon_idx < len(monitors) else monitors[1]
+                raw = sct.grab(mon)
                 img = _PilImage.frombytes('RGB', raw.size, raw.bgra, 'raw', 'BGRX')
             else:
                 img = ImageGrab.grab()
@@ -2305,6 +2336,37 @@ def _screen_generator():
     finally:
         with _viewers_lock:
             _screen_viewers = max(0, _screen_viewers - 1)
+
+@app.route('/api/screen/monitors')
+@login_required
+def screen_monitors():
+    """Gibt alle verfügbaren Monitore zurück."""
+    if not _SCREEN_OK or _SCREEN_BACKEND != 'mss':
+        return jsonify(monitors=[{'idx': 1, 'label': 'Monitor 1'}])
+    try:
+        with _mss_lib.mss() as sct:
+            result = []
+            for i, m in enumerate(sct.monitors):
+                if i == 0:
+                    continue  # Index 0 = alle zusammen, überspringen
+                result.append({'idx': i, 'label': f'Monitor {i}  ({m["width"]}×{m["height"]})'})
+        with _monitor_lock:
+            active = _selected_monitor
+        return jsonify(monitors=result, active=active)
+    except Exception as e:
+        return jsonify(monitors=[{'idx': 1, 'label': 'Monitor 1'}], active=1)
+
+@app.route('/api/screen/monitor', methods=['POST'])
+@login_required
+def screen_set_monitor():
+    """Setzt den aktiven Monitor für den Stream."""
+    global _selected_monitor
+    idx = request.get_json(force=True).get('idx', 1)
+    with _monitor_lock:
+        _selected_monitor = int(idx)
+    with _frame_lock:
+        pass  # nächster Frame wird automatisch vom neuen Monitor sein
+    return jsonify(ok=True, active=_selected_monitor)
 
 @app.route('/api/screen')
 @login_required
