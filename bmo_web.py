@@ -458,7 +458,7 @@ def save_settings():
 @app.route('/api/friends', methods=['GET'])
 @login_required
 def list_friends():
-    return jsonify(friends=[{'idx': i, 'name': f['name']} for i, f in enumerate(FRIENDS)])
+    return jsonify(friends=[{'idx': i, 'name': f['name'], 'url': f['url']} for i, f in enumerate(FRIENDS)])
 
 # ── BMO ICON SVG ──────────────────────────────────────────────────
 BMO_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 215">
@@ -1123,7 +1123,9 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showScreen()" style="border-color:#0ea5e9;color:#38bdf8;">
       <span class="icon">🖥️</span>Screen
     </button>
-    <div id="friendBtns"></div>
+    <button class="qbtn friend" onclick="showFriends()">
+      <span class="icon">👥</span>Freunde
+    </button>
     <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
       <span class="icon">⚙️</span>Settings
     </button>
@@ -1223,6 +1225,33 @@ HTML = """<!DOCTYPE html>
   </div>
 </div>
 
+<!-- FREUNDE OVERLAY -->
+<div class="overlay" id="friendsOverlay" onclick="closeOverlay('friendsOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h2 style="margin:0;">👥 Freunde</h2>
+      <button onclick="toggleFriendsEdit()"
+        style="background:none;border:1px solid var(--border);border-radius:10px;color:var(--text2);padding:6px 12px;cursor:pointer;font-size:13px;">✏️ Bearbeiten</button>
+    </div>
+    <!-- Edit-Bereich (standardmäßig versteckt) -->
+    <div id="friendsEditArea" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">Name|http://IP:5000 — eine pro Zeile</div>
+      <textarea id="friendsEditInput" rows="4" placeholder="Alice|http://100.x.x.x:5000&#10;Bob|http://100.y.y.y:5000"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:11px 14px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box;resize:vertical;font-family:monospace;"></textarea>
+      <div id="friendsEditMsg" style="font-size:13px;color:#5eead4;min-height:16px;margin-top:4px;"></div>
+      <button onclick="saveFriendsEdit()"
+        style="width:100%;margin-top:8px;padding:12px;background:var(--green);border:none;border-radius:12px;color:#000;font-size:14px;font-weight:600;cursor:pointer;">Speichern</button>
+    </div>
+    <button onclick="scareAll()"
+      style="width:100%;padding:14px;background:#f59e0b;border:none;border-radius:14px;color:#000;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:16px;">
+      👻 Alle gleichzeitig schrecken
+    </button>
+    <div id="friendsList"></div>
+    <button class="btn-primary" onclick="closeOverlay('friendsOverlay')" style="margin-top:14px;">Schließen</button>
+  </div>
+</div>
+
 <!-- KAMERA OVERLAY -->
 <div class="overlay" id="cameraOverlay" onclick="void(0)">
   <div class="sheet" onclick="event.stopPropagation()">
@@ -1278,13 +1307,16 @@ HTML = """<!DOCTYPE html>
       <span style="font-weight:600;font-size:15px;color:#e2e8f0;">🖥️ Bildschirm Live</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <span id="screenFps" style="font-size:11px;color:#64748b;"></span>
+        <button onclick="toggleFullscreen('screenImg')"
+          style="background:none;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:5px 12px;cursor:pointer;font-size:13px;">⛶ Vollbild</button>
         <button onclick="closeScreen()"
           style="background:none;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:5px 12px;cursor:pointer;font-size:13px;">
           ✕ Schließen
         </button>
       </div>
     </div>
-    <img id="screenImg" src="" alt="Bildschirm wird geladen...">
+    <div id="monitorPicker" style="display:flex;gap:6px;padding:6px 0 2px;flex-wrap:wrap;"></div>
+    <img id="screenImg" src="" alt="Bildschirm wird geladen..." ondblclick="toggleFullscreen('screenImg')">
   </div>
 </div>
 
@@ -1295,13 +1327,16 @@ HTML = """<!DOCTYPE html>
       <span id="friendScreenTitle" style="font-weight:600;font-size:15px;color:#fbbf24;">🖥️ Freund – Bildschirm Live</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <span id="friendScreenStatus" style="font-size:11px;color:#64748b;"></span>
+        <button onclick="toggleFullscreen('friendScreenImg')"
+          style="background:none;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:5px 12px;cursor:pointer;font-size:13px;">⛶ Vollbild</button>
         <button onclick="closeFriendScreen()"
           style="background:none;border:1px solid #334155;border-radius:8px;color:#94a3b8;padding:5px 12px;cursor:pointer;font-size:13px;">
           ✕ Schließen
         </button>
       </div>
     </div>
-    <img id="friendScreenImg" src="" alt="Freund Bildschirm wird geladen...">
+    <div id="friendMonitorPicker" style="display:flex;gap:6px;padding:6px 0 2px;flex-wrap:wrap;"></div>
+    <img id="friendScreenImg" src="" alt="Freund Bildschirm wird geladen..." ondblclick="toggleFullscreen('friendScreenImg')">
   </div>
 </div>
 
@@ -1458,16 +1493,40 @@ function runCommand(msg) {
 // ── SCREEN OVERLAY ───────────────────────────────────────────────
 let _screenActive = false;
 
-function showScreen() {
+async function showScreen() {
   _screenActive = true;
   document.getElementById('screenOverlay').classList.add('show');
   document.getElementById('screenImg').src = '/api/screen?' + Date.now();
+  await loadMonitorPicker();
+}
+
+async function loadMonitorPicker() {
+  try {
+    const r = await fetch('/api/screen/monitors');
+    const d = await r.json();
+    const picker = document.getElementById('monitorPicker');
+    picker.innerHTML = '';
+    d.monitors.forEach(m => {
+      const btn = document.createElement('button');
+      btn.textContent = m.label;
+      btn.dataset.idx = m.idx;
+      btn.style.cssText = 'padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid ' +
+        (m.idx === d.active ? '#38bdf8;background:#0ea5e9;color:#fff;font-weight:600;' : '#334155;background:none;color:#94a3b8;');
+      btn.onclick = () => selectMonitor(m.idx);
+      picker.appendChild(btn);
+    });
+  } catch(e) {}
+}
+
+async function selectMonitor(idx) {
+  await fetch('/api/screen/monitor', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({idx})});
+  document.getElementById('screenImg').src = '/api/screen?' + Date.now();
+  await loadMonitorPicker();
 }
 
 function closeScreen() {
   _screenActive = false;
   document.getElementById('screenOverlay').classList.remove('show');
-  // src leeren stoppt den MJPEG-Stream (spart Bandbreite)
   setTimeout(() => {
     if (!_screenActive) document.getElementById('screenImg').src = '';
   }, 300);
@@ -1520,25 +1579,83 @@ async function loadFriends() {
     const r = await fetch('/api/friends');
     const d = await r.json();
     _friends = d.friends || [];
-    renderFriendButtons();
   } catch(e) {}
 }
 
-function renderFriendButtons() {
-  const container = document.getElementById('friendBtns');
-  container.innerHTML = '';
+function renderFriendsList() {
+  const list = document.getElementById('friendsList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!_friends.length) {
+    list.innerHTML = '<div style="color:var(--text2);font-size:14px;text-align:center;padding:16px;">Keine Freunde eingetragen.<br>Gehe zu Settings um Freunde hinzuzufügen.</div>';
+    return;
+  }
   _friends.forEach(f => {
-    const s = document.createElement('button');
-    s.className = 'qbtn friend';
-    s.innerHTML = `<span class="icon">👻</span>${f.name}`;
-    s.onclick = () => triggerFriendJumpscare(f.idx, f.name);
-    container.appendChild(s);
-    const sc = document.createElement('button');
-    sc.className = 'qbtn friend';
-    sc.innerHTML = `<span class="icon">🖥️</span>${f.name}`;
-    sc.onclick = () => showFriendScreen(f.idx, f.name);
-    container.appendChild(sc);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:10px;';
+    row.innerHTML = `
+      <span style="flex:1;font-size:15px;font-weight:600;">${f.name}</span>
+      <button onclick="triggerFriendJumpscare(${f.idx},'${f.name}')"
+        style="padding:10px 14px;background:var(--bg3);border:1px solid #f59e0b;border-radius:12px;color:#fbbf24;font-size:13px;cursor:pointer;">👻 Scare</button>
+      <button onclick="closeOverlay('friendsOverlay');showFriendScreen(${f.idx},'${f.name}')"
+        style="padding:10px 14px;background:var(--bg3);border:1px solid #0ea5e9;border-radius:12px;color:#38bdf8;font-size:13px;cursor:pointer;">🖥️ Screen</button>`;
+    list.appendChild(row);
   });
+}
+
+function showFriends() {
+  renderFriendsList();
+  document.getElementById('friendsEditArea').style.display = 'none';
+  document.getElementById('friendsOverlay').classList.add('show');
+}
+
+function toggleFriendsEdit() {
+  const area = document.getElementById('friendsEditArea');
+  const open = area.style.display !== 'none';
+  if (open) {
+    area.style.display = 'none';
+  } else {
+    document.getElementById('friendsEditInput').value =
+      (_friends.map(f => f.name + '|' + (f.url || '')).join('\\n'));
+    document.getElementById('friendsEditMsg').textContent = '';
+    area.style.display = '';
+  }
+}
+
+async function saveFriendsEdit() {
+  const raw = document.getElementById('friendsEditInput').value
+                .split('\\n').map(s => s.trim()).filter(Boolean).join(',');
+  const msg = document.getElementById('friendsEditMsg');
+  msg.textContent = 'Speichere...';
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({friends: raw})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      msg.textContent = 'Gespeichert ✓';
+      await loadFriends();
+      renderFriendsList();
+      setTimeout(() => { document.getElementById('friendsEditArea').style.display = 'none'; }, 800);
+    } else {
+      msg.style.color = '#f87171';
+      msg.textContent = 'Fehler beim Speichern.';
+    }
+  } catch(e) {
+    msg.style.color = '#f87171';
+    msg.textContent = 'Verbindungsfehler.';
+  }
+}
+
+function toggleFullscreen(imgId) {
+  const el = document.getElementById(imgId);
+  if (!document.fullscreenElement) {
+    el.requestFullscreen && el.requestFullscreen();
+  } else {
+    document.exitFullscreen && document.exitFullscreen();
+  }
 }
 
 async function triggerFriendJumpscare(idx, name) {
@@ -1551,17 +1668,54 @@ async function triggerFriendJumpscare(idx, name) {
   }
 }
 
+async function scareAll() {
+  if (!_friends.length) return;
+  closeOverlay('friendsOverlay');
+  addMsg('👻 Scare an alle Freunde...', 'sys');
+  await Promise.all(_friends.map(f => triggerFriendJumpscare(f.idx, f.name)));
+}
+
 let _friendScreenActive = false;
-function showFriendScreen(idx, name) {
+let _friendScreenIdx = 0;
+
+async function showFriendScreen(idx, name) {
   _friendScreenActive = true;
+  _friendScreenIdx = idx;
   document.getElementById('friendScreenTitle').textContent = `🖥️ ${name} – Bildschirm Live`;
   document.getElementById('friendScreenStatus').textContent = 'Verbinde...';
+  document.getElementById('friendMonitorPicker').innerHTML = '';
   document.getElementById('friendScreenOverlay').classList.add('show');
   const img = document.getElementById('friendScreenImg');
   img.src = `/api/friend/${idx}/screen?` + Date.now();
   img.onload  = () => { document.getElementById('friendScreenStatus').textContent = 'Live'; };
   img.onerror = () => { document.getElementById('friendScreenStatus').textContent = '⛔ Kein Zugriff'; img.src = ''; };
+  await loadFriendMonitorPicker(idx);
 }
+
+async function loadFriendMonitorPicker(idx) {
+  try {
+    const r = await fetch(`/api/friend/${idx}/screen/monitors`);
+    const d = await r.json();
+    const picker = document.getElementById('friendMonitorPicker');
+    picker.innerHTML = '';
+    (d.monitors || []).forEach(m => {
+      const btn = document.createElement('button');
+      btn.textContent = m.label;
+      btn.style.cssText = 'padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid ' +
+        (m.idx === d.active ? '#fbbf24;background:#f59e0b;color:#000;font-weight:600;' : '#334155;background:none;color:#94a3b8;');
+      btn.onclick = () => selectFriendMonitor(idx, m.idx);
+      picker.appendChild(btn);
+    });
+  } catch(e) {}
+}
+
+async function selectFriendMonitor(friendIdx, monIdx) {
+  await fetch(`/api/friend/${friendIdx}/screen/monitor`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({idx: monIdx})});
+  const img = document.getElementById('friendScreenImg');
+  img.src = `/api/friend/${friendIdx}/screen?` + Date.now();
+  await loadFriendMonitorPicker(friendIdx);
+}
+
 function closeFriendScreen() {
   _friendScreenActive = false;
   document.getElementById('friendScreenOverlay').classList.remove('show');
@@ -1574,7 +1728,7 @@ async function showSettings() {
     const r = await fetch('/api/settings');
     const d = await r.json();
     document.getElementById('setFriends').value =
-      (d.friends || '').split(',').map(s => s.trim()).filter(Boolean).join('\n');
+      (d.friends || '').split(',').map(s => s.trim()).filter(Boolean).join('\\n');
   } catch(e) {}
   document.getElementById('setPw').value = '';
   document.getElementById('settingsMsg').style.color = '#5eead4';
@@ -1585,7 +1739,7 @@ async function showSettings() {
 async function saveSettings() {
   const pw      = document.getElementById('setPw').value.trim();
   const friends = document.getElementById('setFriends').value
-                    .split('\n').map(s => s.trim()).filter(Boolean).join(',');
+                    .split('\\n').map(s => s.trim()).filter(Boolean).join(',');
   const msg = document.getElementById('settingsMsg');
   msg.textContent = 'Speichere...';
   try {
@@ -1965,10 +2119,10 @@ def manifest():
 @login_required
 def status():
     try:
-        r = req.get(f"{CORE_URL}/status", timeout=2)
+        r = req.get(f"{CORE_URL}/status", timeout=(3, 5))
         return jsonify(r.json())
     except:
-        cpu  = psutil.cpu_percent(interval=0.5)
+        cpu  = psutil.cpu_percent()
         ram  = psutil.virtual_memory().percent
         time = datetime.datetime.now().strftime('%H:%M')
         return jsonify(cpu=cpu, ram=ram, time=time, gpu=None)
@@ -2144,30 +2298,41 @@ def commands_list():
 
 # ── SCREEN STREAMING ──────────────────────────────────────────────
 _latest_frame: bytes | None = None
-_frame_lock = threading.Lock()
+_frame_lock     = threading.Lock()
+_capture_active = False
+_screen_viewers = 0
+_viewers_lock   = threading.Lock()
+_selected_monitor = 1  # 1 = erster echter Monitor (mss: 0 = alle zusammen)
+_monitor_lock   = threading.Lock()
 
 def _capture_daemon():
-    """Hintergrund-Thread: erfasst Desktop so schnell wie möglich (~15 FPS) mit mss."""
-    global _latest_frame
+    """Hintergrund-Thread: läuft nur solange jemand den Screen anschaut."""
+    global _latest_frame, _capture_active
     target_interval = 1.0 / 15
-    if _SCREEN_BACKEND == 'mss':
-        sct = _mss_lib.mss()
+    sct = _mss_lib.mss() if _SCREEN_BACKEND == 'mss' else None
     while True:
+        with _viewers_lock:
+            if _screen_viewers == 0:
+                _capture_active = False
+                break
         t0 = _time.monotonic()
         try:
             if _SCREEN_BACKEND == 'mss':
-                monitor = sct.monitors[0]
-                raw = sct.grab(monitor)
+                with _monitor_lock:
+                    mon_idx = _selected_monitor
+                monitors = sct.monitors
+                mon = monitors[mon_idx] if mon_idx < len(monitors) else monitors[1]
+                raw = sct.grab(mon)
                 img = _PilImage.frombytes('RGB', raw.size, raw.bgra, 'raw', 'BGRX')
             else:
                 img = ImageGrab.grab()
             w, h = img.size
-            nw = min(w, 1280)
+            nw = min(w, 1920)
             nh = int(h * nw / w)
             if (nw, nh) != (w, h):
                 img = img.resize((nw, nh), _PilImage.BILINEAR)
             buf = io.BytesIO()
-            img.save(buf, format='JPEG', quality=60, optimize=False)
+            img.save(buf, format='JPEG', quality=82, optimize=False)
             with _frame_lock:
                 _latest_frame = buf.getvalue()
         except Exception:
@@ -2176,18 +2341,63 @@ def _capture_daemon():
         wait = target_interval - elapsed
         if wait > 0:
             _time.sleep(wait)
+    if sct:
+        sct.close()
 
-if _SCREEN_OK:
-    threading.Thread(target=_capture_daemon, daemon=True).start()
+def _ensure_capture_running():
+    global _capture_active
+    with _viewers_lock:
+        if not _capture_active and _SCREEN_OK:
+            _capture_active = True
+            threading.Thread(target=_capture_daemon, daemon=True).start()
 
 def _screen_generator():
-    """MJPEG-Generator: liefert den zuletzt erfassten Frame mit ~15 FPS."""
-    while True:
-        with _frame_lock:
-            frame = _latest_frame
-        if frame:
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        _time.sleep(0.067)
+    """MJPEG-Generator: startet Capture beim ersten Zuschauer, stoppt wenn keiner mehr schaut."""
+    global _screen_viewers
+    with _viewers_lock:
+        _screen_viewers += 1
+    _ensure_capture_running()
+    try:
+        while True:
+            with _frame_lock:
+                frame = _latest_frame
+            if frame:
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            _time.sleep(0.067)
+    finally:
+        with _viewers_lock:
+            _screen_viewers = max(0, _screen_viewers - 1)
+
+@app.route('/api/screen/monitors')
+@login_required
+def screen_monitors():
+    """Gibt alle verfügbaren Monitore zurück."""
+    if not _SCREEN_OK or _SCREEN_BACKEND != 'mss':
+        return jsonify(monitors=[{'idx': 1, 'label': 'Monitor 1'}])
+    try:
+        with _mss_lib.mss() as sct:
+            result = []
+            for i, m in enumerate(sct.monitors):
+                if i == 0:
+                    continue  # Index 0 = alle zusammen, überspringen
+                result.append({'idx': i, 'label': f'Monitor {i}  ({m["width"]}×{m["height"]})'})
+        with _monitor_lock:
+            active = _selected_monitor
+        return jsonify(monitors=result, active=active)
+    except Exception as e:
+        return jsonify(monitors=[{'idx': 1, 'label': 'Monitor 1'}], active=1)
+
+@app.route('/api/screen/monitor', methods=['POST'])
+@login_required
+def screen_set_monitor():
+    """Setzt den aktiven Monitor für den Stream."""
+    global _selected_monitor
+    idx = request.get_json(force=True).get('idx', 1)
+    with _monitor_lock:
+        _selected_monitor = int(idx)
+    with _frame_lock:
+        pass  # nächster Frame wird automatisch vom neuen Monitor sein
+    return jsonify(ok=True, active=_selected_monitor)
 
 @app.route('/api/screen')
 @login_required
@@ -2229,6 +2439,31 @@ def friend_screen(idx):
         )
     except Exception as e:
         return jsonify(error=str(e)), 503
+
+@app.route('/api/friend/<int:idx>/screen/monitors')
+@login_required
+def friend_screen_monitors(idx):
+    if idx >= len(FRIENDS):
+        return jsonify(monitors=[], active=1), 404
+    url = FRIENDS[idx]['url']
+    try:
+        r = req.get(f"{url}/api/admin/screen/monitors", timeout=5)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify(monitors=[{'idx': 1, 'label': 'Monitor 1'}], active=1)
+
+@app.route('/api/friend/<int:idx>/screen/monitor', methods=['POST'])
+@login_required
+def friend_screen_set_monitor(idx):
+    if idx >= len(FRIENDS):
+        return jsonify(ok=False), 404
+    url = FRIENDS[idx]['url']
+    try:
+        data = request.get_json(force=True)
+        r = req.post(f"{url}/api/admin/screen/monitor", json=data, timeout=5)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
 
 
 # ── START ──────────────────────────────────────────────────────────
