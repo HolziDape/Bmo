@@ -23,7 +23,7 @@ if exist "%~dp0..\bmo_python.txt" (
 :: Falls kein gespeicherter Pfad, pythonw aus PATH versuchen
 if "%PYEXE%"=="" set "PYEXE=pythonw"
 
-start "" "%PYEXE%" "%~dp0..\bmo_watchdog.py"
+start "" "%PYEXE%" "%~dp0..\src\bmo_watchdog.py"
 
 echo   [ OK ]  Watchdog laeuft im Hintergrund
 echo   [ OK ]  Core + Web werden automatisch gestartet

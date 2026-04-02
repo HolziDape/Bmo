@@ -27,7 +27,7 @@ import logging
 sys.path.insert(0, r"C:\Users\damja\AppData\Roaming\Python\Python310\site-packages")
 
 # ── LOGGING ────────────────────────────────────────────────────────────────
-LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "bmo_core.log")
+LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_intern", "logs", "bmo_core.log")
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -70,16 +70,17 @@ PORT         = 6000
 OLLAMA_MODEL = "llama3"
 
 SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
-RVC_MODEL         = os.path.join(SCRIPT_DIR, "models",  "BMO_500e_7000s.pth")
-RVC_INDEX         = os.path.join(SCRIPT_DIR, "models",  "BMO.index")
-SOUNDS_BASE       = os.path.join(SCRIPT_DIR, "assets",  "sounds")
+BASE_DIR          = os.path.dirname(SCRIPT_DIR)
+RVC_MODEL         = os.path.join(BASE_DIR, "_intern", "models",  "BMO_500e_7000s.pth")
+RVC_INDEX         = os.path.join(BASE_DIR, "_intern", "models",  "BMO.index")
+SOUNDS_BASE       = os.path.join(BASE_DIR, "assets",  "sounds")
 SHUTDOWN_DIR      = os.path.join(SOUNDS_BASE, "shutdown")
-CONVERSATIONS_PATH = os.path.join(SCRIPT_DIR, "data",   "conversations.json")
+CONVERSATIONS_PATH = os.path.join(BASE_DIR, "_intern", "data",   "conversations.json")
 
 SPOTIFY_CLIENT_ID     = "365b371ad2c7483ea7dda2029869c3a3"
 SPOTIFY_CLIENT_SECRET = "2c6b2968fbb9425792b99355b03b65ac"
 SPOTIFY_REDIRECT_URI  = "http://127.0.0.1:8888/callback"
-SPOTIFY_CACHE_PATH    = os.path.join(SCRIPT_DIR, ".spotify_cache")
+SPOTIFY_CACHE_PATH    = os.path.join(BASE_DIR, ".spotify_cache")
 
 SPOTIFY_PLAYLIST_ID = "1CQx19s0ib50fjgxM47FXY"
 
@@ -492,8 +493,8 @@ def shutdown_pc():
 
 # ── JUMPSCARE ─────────────────────────────────────────────────────────────────
 
-JUMPSCARE_IMAGE = os.path.join(SCRIPT_DIR, "assets", "jumpscare", "jumpscare.png")
-JUMPSCARE_SOUND = os.path.join(SCRIPT_DIR, "assets", "jumpscare", "jumpscare.mp3")
+JUMPSCARE_IMAGE = os.path.join(BASE_DIR, "assets", "jumpscare", "jumpscare.png")
+JUMPSCARE_SOUND = os.path.join(BASE_DIR, "assets", "jumpscare", "jumpscare.mp3")
 
 def do_jumpscare():
     """Öffnet Vollbild-Jumpscare auf dem Hauptmonitor via tkinter."""

@@ -15,7 +15,8 @@ import sys
 import logging
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-LOG_PATH = os.path.join(BASE, "logs", "bmo_watchdog.log")
+BASE_DIR = os.path.dirname(BASE)
+LOG_PATH = os.path.join(BASE_DIR, "_intern", "logs", "bmo_watchdog.log")
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 
 logging.basicConfig(

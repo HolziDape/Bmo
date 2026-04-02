@@ -13,7 +13,7 @@ import logging
 import subprocess
 
 # ── LOGGING ────────────────────────────────────────────────────────────────
-LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "bmo_web.log")
+LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_intern", "logs", "bmo_web.log")
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -48,7 +48,7 @@ PORT       = 5000
 CORE_URL   = "http://localhost:6000"
 
 # ── KONFIGURATION (aus bmo_config.txt) ────────────────────────────
-_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bmo_config.txt")
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bmo_config.txt")
 
 def _load_config():
     """Liest alle Schlüssel aus bmo_config.txt als Dict."""
