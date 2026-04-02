@@ -1123,10 +1123,9 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showScreen()" style="border-color:#0ea5e9;color:#38bdf8;">
       <span class="icon">🖥️</span>Screen
     </button>
-    <button id="allScareBtn" class="qbtn friend" onclick="scareAll()" style="display:none;">
-      <span class="icon">👻</span>Alle Scare
+    <button class="qbtn friend" onclick="showFriends()">
+      <span class="icon">👥</span>Freunde
     </button>
-    <div id="friendBtns" style="display:contents;"></div>
     <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
       <span class="icon">⚙️</span>Settings
     </button>
@@ -1223,6 +1222,20 @@ HTML = """<!DOCTYPE html>
       <div style="text-align:center;margin-top:8px;font-size:22px;font-weight:700;color:var(--green)" id="volLabel">50%</div>
     </div>
     <button class="btn-primary" onclick="closeOverlay('spotifyOverlay')">Schließen</button>
+  </div>
+</div>
+
+<!-- FREUNDE OVERLAY -->
+<div class="overlay" id="friendsOverlay" onclick="closeOverlay('friendsOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>👥 Freunde</h2>
+    <button onclick="scareAll()"
+      style="width:100%;padding:14px;background:#f59e0b;border:none;border-radius:14px;color:#000;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:16px;">
+      👻 Alle gleichzeitig schrecken
+    </button>
+    <div id="friendsList"></div>
+    <button class="btn-primary" onclick="closeOverlay('friendsOverlay')" style="margin-top:14px;">Schließen</button>
   </div>
 </div>
 
@@ -1523,22 +1536,33 @@ async function loadFriends() {
     const r = await fetch('/api/friends');
     const d = await r.json();
     _friends = d.friends || [];
-    renderFriendButtons();
   } catch(e) {}
 }
 
-function renderFriendButtons() {
-  const container = document.getElementById('friendBtns');
-  container.innerHTML = '';
-  const allBtn = document.getElementById('allScareBtn');
-  allBtn.style.display = _friends.length ? '' : 'none';
+function renderFriendsList() {
+  const list = document.getElementById('friendsList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!_friends.length) {
+    list.innerHTML = '<div style="color:var(--text2);font-size:14px;text-align:center;padding:16px;">Keine Freunde eingetragen.<br>Gehe zu Settings um Freunde hinzuzufügen.</div>';
+    return;
+  }
   _friends.forEach(f => {
-    const sc = document.createElement('button');
-    sc.className = 'qbtn friend';
-    sc.innerHTML = `<span class="icon">🖥️</span>${f.name}`;
-    sc.onclick = () => showFriendScreen(f.idx, f.name);
-    container.appendChild(sc);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:10px;';
+    row.innerHTML = `
+      <span style="flex:1;font-size:15px;font-weight:600;">${f.name}</span>
+      <button onclick="triggerFriendJumpscare(${f.idx},'${f.name}')"
+        style="padding:10px 14px;background:var(--bg3);border:1px solid #f59e0b;border-radius:12px;color:#fbbf24;font-size:13px;cursor:pointer;">👻 Scare</button>
+      <button onclick="closeOverlay('friendsOverlay');showFriendScreen(${f.idx},'${f.name}')"
+        style="padding:10px 14px;background:var(--bg3);border:1px solid #0ea5e9;border-radius:12px;color:#38bdf8;font-size:13px;cursor:pointer;">🖥️ Screen</button>`;
+    list.appendChild(row);
   });
+}
+
+function showFriends() {
+  renderFriendsList();
+  document.getElementById('friendsOverlay').classList.add('show');
 }
 
 async function triggerFriendJumpscare(idx, name) {
@@ -1553,6 +1577,7 @@ async function triggerFriendJumpscare(idx, name) {
 
 async function scareAll() {
   if (!_friends.length) return;
+  closeOverlay('friendsOverlay');
   addMsg('👻 Scare an alle Freunde...', 'sys');
   await Promise.all(_friends.map(f => triggerFriendJumpscare(f.idx, f.name)));
 }
