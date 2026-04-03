@@ -1173,7 +1173,6 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn purple" onclick="showSpotify()">
       <span class="icon">🎵</span>Spotify
     </button>
-
     <button class="qbtn orange" onclick="confirmShutdown()">
       <span class="icon">⏻</span>Shutdown
     </button>
@@ -1186,23 +1185,20 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showScreen()" style="border-color:#0ea5e9;color:#38bdf8;">
       <span class="icon">🖥️</span>Screen
     </button>
-    <button class="qbtn friend" onclick="showFriends()">
-      <span class="icon">👥</span>Freunde
-    </button>
-    <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
-      <span class="icon">⚙️</span>Settings
-    </button>
     <button class="qbtn" onclick="showNotify()" style="border-color:#06b6d4;color:#22d3ee;">
       <span class="icon">🔔</span>Notify
-    </button>
-    <button class="qbtn friend" onclick="friendNotify()">
-      <span class="icon">🔔</span>F.Notify
     </button>
     <button class="qbtn" onclick="showProcesses()" style="border-color:#fb923c;color:#fdba74;">
       <span class="icon">📋</span>Prozesse
     </button>
-    <button class="qbtn" onclick="showPong()" style="border-color:#22c55e;color:#4ade80;">
-      <span class="icon">🏓</span>Pong
+    <button class="qbtn" onclick="showSpiele()" style="border-color:#22c55e;color:#4ade80;">
+      <span class="icon">🎮</span>Spiele
+    </button>
+    <button class="qbtn friend" onclick="showFreunde()">
+      <span class="icon">👥</span>Freunde
+    </button>
+    <button class="qbtn" onclick="showSettings()" style="border-color:#475569;color:#94a3b8;">
+      <span class="icon">⚙️</span>Settings
     </button>
   </div>
 
@@ -1454,6 +1450,109 @@ HTML = """<!DOCTYPE html>
       <button onclick="saveSettings()"
         style="flex:2;padding:12px;border-radius:12px;border:none;background:var(--green);color:#000;cursor:pointer;font-size:14px;font-weight:600;">Speichern</button>
     </div>
+  </div>
+</div>
+
+<!-- FREUNDE OVERLAY -->
+<div class="overlay" id="freundeOverlay" onclick="closeOverlay('freundeOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>👥 Freund Aktionen</h2>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:18px;">Alles was du mit deinem Freund machen kannst.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button onclick="showFriendScreen();closeOverlay('freundeOverlay')"
+        style="padding:16px 12px;background:var(--bg3);border:1px solid #0ea5e9;border-radius:14px;color:#38bdf8;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <span style="font-size:22px;">🖥️</span>Screen ansehen
+      </button>
+      <button onclick="triggerFriendJumpscare();closeOverlay('freundeOverlay')"
+        style="padding:16px 12px;background:var(--bg3);border:1px solid #ef4444;border-radius:14px;color:#f87171;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <span style="font-size:22px;">👻</span>Jumpscare
+      </button>
+      <button onclick="showFreundNotify();closeOverlay('freundeOverlay')"
+        style="padding:16px 12px;background:var(--bg3);border:1px solid #06b6d4;border-radius:14px;color:#22d3ee;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <span style="font-size:22px;">🔔</span>Notification
+      </button>
+      <button onclick="showFreundProcesses();closeOverlay('freundeOverlay')"
+        style="padding:16px 12px;background:var(--bg3);border:1px solid #fb923c;border-radius:14px;color:#fdba74;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <span style="font-size:22px;">📋</span>Prozesse
+      </button>
+      <button onclick="challengeFriendPong();closeOverlay('freundeOverlay')"
+        style="padding:16px 12px;background:var(--bg3);border:1px solid #22c55e;border-radius:14px;color:#4ade80;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;grid-column:span 2;">
+        <span style="font-size:22px;">🏓</span>Pong herausfordern
+      </button>
+    </div>
+    <button class="btn-primary" onclick="closeOverlay('freundeOverlay')" style="margin-top:14px;background:var(--bg3);">Schließen</button>
+  </div>
+</div>
+
+<!-- FREUND NOTIFY OVERLAY -->
+<div class="overlay" id="freundNotifyOverlay" onclick="closeOverlay('freundNotifyOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>🔔 Notification an Freund</h2>
+    <div class="notify-form">
+      <input type="text" id="freundNotifyTitle" placeholder="Titel (z.B. BMO)" maxlength="64">
+      <textarea id="freundNotifyMsg" placeholder="Nachricht..."></textarea>
+    </div>
+    <button class="btn-primary" onclick="sendFreundNotification()">🔔 Senden</button>
+    <button class="btn-primary" onclick="closeOverlay('freundNotifyOverlay')"
+      style="background:var(--bg3);border:1px solid var(--border);margin-top:8px;">Abbrechen</button>
+  </div>
+</div>
+
+<!-- FREUND PROZESSE OVERLAY -->
+<div class="overlay" id="freundProcessesOverlay" onclick="closeOverlay('freundProcessesOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h2 style="margin:0;">📋 Freund – Prozesse</h2>
+      <button onclick="loadFreundProcesses()"
+        style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text2);padding:5px 14px;font-size:13px;cursor:pointer;">
+        ↻ Reload
+      </button>
+    </div>
+    <div class="proc-list" id="freundProcList">
+      <div class="notes-empty">Lade...</div>
+    </div>
+    <button class="btn-primary" onclick="closeOverlay('freundProcessesOverlay')" style="margin-top:12px;">Schließen</button>
+  </div>
+</div>
+
+<!-- SPIELE OVERLAY -->
+<div class="overlay" id="spieleOverlay" onclick="closeOverlay('spieleOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>🎮 Spiele</h2>
+    <div style="display:grid;gap:10px;margin-top:8px;">
+      <button onclick="closeOverlay('spieleOverlay');showPong()"
+        style="padding:20px;background:var(--bg3);border:1px solid #22c55e;border-radius:14px;color:#4ade80;font-size:16px;cursor:pointer;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:28px;">🏓</span>
+        <div style="text-align:left;">
+          <div style="font-weight:600;">Pong</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px;">Du vs KI · Fordere Freund heraus</div>
+        </div>
+      </button>
+    </div>
+    <button class="btn-primary" onclick="closeOverlay('spieleOverlay')" style="margin-top:14px;background:var(--bg3);">Schließen</button>
+  </div>
+</div>
+
+<!-- SETTINGS OVERLAY -->
+<div class="overlay" id="settingsOverlay" onclick="closeOverlay('settingsOverlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>⚙️ Settings</h2>
+    <div style="margin-bottom:14px;">
+      <div style="color:var(--text2);font-size:13px;margin-bottom:8px;">Admin-Zugriff für Freunde</div>
+      <div style="color:var(--text3);font-size:12px;margin-bottom:10px;">
+        Erlaubt Freunden Screen, Prozesse, Notify und Pong über deinen BMO-Link zu nutzen.
+      </div>
+      <button id="adminToggleBtn" onclick="toggleAdminAccess()"
+        style="width:100%;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;color:var(--text2);font-size:15px;cursor:pointer;transition:border-color .2s,color .2s;">
+        🔒 Admin-Zugriff: AUS
+      </button>
+    </div>
+    <button class="btn-primary" onclick="closeOverlay('settingsOverlay')" style="background:var(--bg3);">Schließen</button>
   </div>
 </div>
 
@@ -1952,6 +2051,63 @@ async function saveSettings() {
   } catch(e) {
     msg.style.color = '#fca5a5'; msg.textContent = 'Verbindungsfehler';
   }
+// ── FREUNDE OVERLAY ──────────────────────────────────────────────
+function showFreunde() {
+  document.getElementById('freundeOverlay').classList.add('show');
+}
+function showFreundNotify() {
+  document.getElementById('freundNotifyOverlay').classList.add('show');
+}
+async function sendFreundNotification() {
+  const title = document.getElementById('freundNotifyTitle').value.trim() || 'BMO';
+  const msg   = document.getElementById('freundNotifyMsg').value.trim();
+  if (!msg) return;
+  try {
+    const r = await fetch('/api/friend/notify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({title, message: msg})
+    });
+    const d = await r.json();
+    addMsg(d.ok ? '🔔 Notification an Freund gesendet!' : '⛔ ' + (d.error||'Fehler'), 'sys');
+  } catch(e) { addMsg('Freund nicht erreichbar 😢', 'sys'); }
+  closeOverlay('freundNotifyOverlay');
+}
+async function showFreundProcesses() {
+  document.getElementById('freundProcessesOverlay').classList.add('show');
+  await loadFreundProcesses();
+}
+async function loadFreundProcesses() {
+  document.getElementById('freundProcList').innerHTML = '<div class="notes-empty">Lade...</div>';
+  try {
+    const r = await fetch('/api/friend/processes');
+    const d = await r.json();
+    if (d.error) { document.getElementById('freundProcList').innerHTML = `<div class="notes-empty">⛔ ${escHtml(d.error)}</div>`; return; }
+    const procs = d.processes || [];
+    if (!procs.length) { document.getElementById('freundProcList').innerHTML = '<div class="notes-empty">Keine Prozesse.</div>'; return; }
+    document.getElementById('freundProcList').innerHTML = procs.map(p => `
+      <div class="proc-item" id="fprc-${p.pid}">
+        <div class="proc-name" title="${escHtml(p.name)}">${escHtml(p.name)}</div>
+        <div class="proc-stats">CPU ${p.cpu}% · RAM ${p.mem}%</div>
+        <button class="proc-kill" onclick="killFreundProcess(${p.pid},this)">Kill</button>
+      </div>
+    `).join('');
+  } catch(e) { document.getElementById('freundProcList').innerHTML = '<div class="notes-empty">Freund nicht erreichbar 😢</div>'; }
+}
+async function killFreundProcess(pid, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch('/api/friend/processes/' + pid + '/kill', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) { document.getElementById('fprc-' + pid)?.remove(); }
+    else { btn.textContent = '⛔'; setTimeout(() => { btn.textContent = 'Kill'; btn.disabled = false; }, 2000); }
+  } catch(e) { btn.textContent = 'Kill'; btn.disabled = false; }
+}
+
+// ── SPIELE OVERLAY ───────────────────────────────────────────────
+function showSpiele() {
+  document.getElementById('spieleOverlay').classList.add('show');
+}
+
 }
 
 // ── SPOTIFY ─────────────────────────────────────────────────────
@@ -2518,33 +2674,26 @@ async function clearDraw() {
 }
 
 // ── PONG GAME ────────────────────────────────────────────────────
-let _pongActive = false, _pongSide = null, _pongRAF = null, _pongPoll = null;
+let _pongActive = false, _pongRAF = null, _pongPoll = null;
 let _myPaddleY = 0.5;
+let _pongFriendMode = false;  // true = wir sind rechts (Freund-Herausforderung)
 
-async function showPong() {
-  await fetch('/api/pong/reset', {method:'POST'}).catch(()=>{});
+async function showPong(friendJoin = false) {
+  _pongFriendMode = friendJoin;
+  if (!friendJoin) {
+    await fetch('/api/pong/start', {method:'POST'}).catch(()=>{});
+  }
   _pongActive = true;
   document.getElementById('pongOverlay').classList.add('show');
-  document.getElementById('pongInfo').textContent = 'Verbinde...';
-  try {
-    const r = await fetch('/api/pong/join', {method:'POST'});
-    const d = await r.json();
-    _pongSide = d.side;
-    document.getElementById('pongInfo').textContent =
-      _pongSide === 'left'      ? '🟢 Du = linkes Paddle (Maus/Touch bewegen)' :
-      _pongSide === 'right'     ? '🟠 Du = rechtes Paddle (Maus/Touch bewegen)' :
-                                  '👀 Zuschauer';
-    _startPongInput();
-    _startPongRender();
-  } catch(e) {
-    document.getElementById('pongInfo').textContent = 'Verbindungsfehler 😢';
-  }
+  document.getElementById('pongInfo').textContent =
+    friendJoin ? '🟠 Du = rechtes Paddle (Maus/Touch)' : '🟢 Du = linkes Paddle (Maus/Touch)';
+  _startPongInput();
+  _startPongRender();
 }
 function closePong() {
   _pongActive = false;
   if (_pongRAF)  cancelAnimationFrame(_pongRAF);
   if (_pongPoll) clearInterval(_pongPoll);
-  _pongSide = null;
   document.getElementById('pongOverlay').classList.remove('show');
 }
 async function pongReset() {
@@ -2562,29 +2711,30 @@ function _startPongInput() {
   canvas.onmousemove  = updateY;
   canvas.ontouchmove  = e => { e.preventDefault(); updateY(e); };
   canvas.ontouchstart = e => { e.preventDefault(); updateY(e); };
+  const side = _pongFriendMode ? 'right' : 'left';
+  const url  = _pongFriendMode ? '/api/friend/pong/paddle' : '/api/pong/paddle';
   _pongPoll = setInterval(async () => {
-    if (!_pongActive || !_pongSide || _pongSide === 'spectator') return;
-    fetch('/api/pong/paddle', {
+    if (!_pongActive) return;
+    fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({side: _pongSide, y: _myPaddleY})
+      body: JSON.stringify({side, y: _myPaddleY})
     }).catch(()=>{});
-  }, 50);
+  }, 40);
 }
 function _startPongRender() {
   const canvas = document.getElementById('pongCanvas');
   const ctx    = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   let state = null, frame = 0;
+  const stateUrl = _pongFriendMode ? '/api/friend/pong/state' : '/api/pong/state';
 
   async function fetchState() {
-    try { state = await (await fetch('/api/pong/state')).json(); } catch(e) {}
+    try { state = await (await fetch(stateUrl)).json(); } catch(e) {}
   }
   function loop() {
     if (!_pongActive) return;
-    if (frame++ % 2 === 0) fetchState();   // ~15 polls/s at 30fps
-    // Background
+    if (frame++ % 2 === 0) fetchState();
     ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, W, H);
-    // Center line
     ctx.setLineDash([8, 12]); ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
     ctx.setLineDash([]);
@@ -2592,14 +2742,20 @@ function _startPongRender() {
       document.getElementById('pongScoreL').textContent = state.score_l ?? 0;
       document.getElementById('pongScoreR').textContent = state.score_r ?? 0;
       const ph = H * 0.15, pw = 12;
-      // Left paddle
-      ctx.fillStyle = _pongSide === 'left' ? '#2b8773' : '#1e4d43';
+      // Left paddle (always us unless friend mode)
+      ctx.fillStyle = !_pongFriendMode ? '#2b8773' : '#1e4d43';
       _roundRect(ctx, 8, state.left * H - ph/2, pw, ph, 4);
-      if (_pongSide === 'left') { ctx.strokeStyle='#4ade80'; ctx.lineWidth=2; _roundRect(ctx, 8, state.left*H-ph/2, pw, ph, 4, true); }
-      // Right paddle
-      ctx.fillStyle = _pongSide === 'right' ? '#f97316' : '#5a2d0c';
+      if (!_pongFriendMode) { ctx.strokeStyle='#4ade80'; ctx.lineWidth=2; _roundRect(ctx, 8, state.left*H-ph/2, pw, ph, 4, true); }
+      // Right paddle (AI or friend-mode us)
+      const rightActive = _pongFriendMode || (state.right_human);
+      ctx.fillStyle = rightActive ? '#f97316' : '#5a2d0c';
       _roundRect(ctx, W-8-pw, state.right * H - ph/2, pw, ph, 4);
-      if (_pongSide === 'right') { ctx.strokeStyle='#4ade80'; ctx.lineWidth=2; _roundRect(ctx, W-8-pw, state.right*H-ph/2, pw, ph, 4, true); }
+      if (_pongFriendMode) { ctx.strokeStyle='#4ade80'; ctx.lineWidth=2; _roundRect(ctx, W-8-pw, state.right*H-ph/2, pw, ph, 4, true); }
+      // AI label on right
+      if (!_pongFriendMode && !state.right_human) {
+        ctx.fillStyle = '#475569'; ctx.font = '11px monospace';
+        ctx.fillText('🤖', W - 28, 18);
+      }
       // Ball glow
       const bx = state.ball.x * W, by = state.ball.y * H;
       const grd = ctx.createRadialGradient(bx, by, 0, bx, by, 14);
@@ -3209,43 +3365,66 @@ def draw_overlay():
 import random as _random
 _pong_lock = threading.Lock()
 _pong = {
-    'ball':    {'x': 0.5, 'y': 0.5, 'vx': 0.012, 'vy': 0.008},
-    'left':    0.5, 'right': 0.5,
-    'score_l': 0,   'score_r': 0,
-    'running': False,
+    'ball':        {'x': 0.5, 'y': 0.5, 'vx': 0.014, 'vy': 0.008},
+    'left':        0.5, 'left_prev':  0.5,
+    'right':       0.5, 'right_prev': 0.5,
+    'score_l':     0,   'score_r':    0,
+    'running':     False,
+    'right_human': False,  # True wenn Freund rechts spielt
 }
 
 def _reset_ball(b, direction):
     b['x'], b['y'] = 0.5, 0.5
-    b['vx'] = direction * 0.012
-    b['vy'] = (_random.random() - 0.5) * 0.016
+    b['vx'] = direction * (0.013 + _random.uniform(0, 0.003))
+    b['vy'] = (_random.random() - 0.5) * 0.018
 
 def _pong_step():
     with _pong_lock:
         if not _pong['running']:
             return
-        b  = _pong['ball']
+        b = _pong['ball']
+
+        # Paddle-Geschwindigkeit (für Spin)
+        lv = _pong['left']  - _pong['left_prev']
+        rv = _pong['right'] - _pong['right_prev']
+        _pong['left_prev']  = _pong['left']
+        _pong['right_prev'] = _pong['right']
+
+        # KI für rechtes Paddle (wenn kein Freund)
+        if not _pong['right_human']:
+            t = b['y']; c = _pong['right']
+            _pong['right'] = max(0.08, min(0.92, c + max(-0.024, min(0.024, t - c))))
+
         b['x'] += b['vx']
         b['y'] += b['vy']
-        if b['y'] <= 0.02 or b['y'] >= 0.98:
-            b['vy'] *= -1
+
+        if b['y'] <= 0.02:
+            b['y'] = 0.02; b['vy'] = abs(b['vy'])
+        if b['y'] >= 0.98:
+            b['y'] = 0.98; b['vy'] = -abs(b['vy'])
+
         ph = 0.15
+        # Linkes Paddle
         if b['x'] <= 0.04:
             if abs(b['y'] - _pong['left']) < ph:
-                b['vx'] = abs(b['vx']) * 1.05
-                b['vy'] += (b['y'] - _pong['left']) * 0.05
-            else:
+                b['x'] = 0.04
+                b['vx'] = abs(b['vx']) * 1.06
+                b['vy'] += (b['y'] - _pong['left']) * 0.06 + lv * 1.4
+            elif b['x'] < 0:
                 _pong['score_r'] += 1
                 _reset_ball(b, 1)
+        # Rechtes Paddle
         if b['x'] >= 0.96:
             if abs(b['y'] - _pong['right']) < ph:
-                b['vx'] = -abs(b['vx']) * 1.05
-                b['vy'] += (b['y'] - _pong['right']) * 0.05
-            else:
+                b['x'] = 0.96
+                b['vx'] = -abs(b['vx']) * 1.06
+                b['vy'] += (b['y'] - _pong['right']) * 0.06 + rv * 1.4
+            elif b['x'] > 1.0:
                 _pong['score_l'] += 1
                 _reset_ball(b, -1)
+
         spd = (b['vx']**2 + b['vy']**2) ** 0.5
-        mx  = 0.025
+        mx  = 0.030
         if spd > mx:
             b['vx'] = b['vx'] / spd * mx
             b['vy'] = b['vy'] / spd * mx
@@ -3253,36 +3432,35 @@ def _pong_step():
 def _pong_loop():
     while _pong['running']:
         _pong_step()
-        _time.sleep(0.033)
+        _time.sleep(0.016)  # ~62 fps
 
-@app.route('/api/pong/join', methods=['POST'])
-@login_required
-def pong_join():
+def _pong_state_dict():
     with _pong_lock:
-        occupied = list(_pong.get('players', {}).values())
-        if 'left' not in occupied:
-            _pong.setdefault('players', {})['p1'] = 'left'
-            side = 'left'
-        elif 'right' not in occupied:
-            _pong.setdefault('players', {})['p2'] = 'right'
-            side = 'right'
-        else:
-            side = 'spectator'
-        if not _pong['running']:
-            _pong['running'] = True
-            threading.Thread(target=_pong_loop, daemon=True).start()
-    return jsonify(side=side)
-
-@app.route('/api/pong/state', methods=['GET'])
-@login_required
-def pong_state():
-    with _pong_lock:
-        return jsonify(
+        return dict(
             ball=dict(_pong['ball']),
             left=_pong['left'], right=_pong['right'],
             score_l=_pong['score_l'], score_r=_pong['score_r'],
             running=_pong['running'],
+            right_human=_pong['right_human'],
         )
+
+@app.route('/api/pong/start', methods=['POST'])
+@login_required
+def pong_start():
+    with _pong_lock:
+        _pong['score_l'] = 0; _pong['score_r'] = 0
+        _pong['right_human'] = False
+        b = _pong['ball']
+        _reset_ball(b, 1 if _random.random() > 0.5 else -1)
+        if not _pong['running']:
+            _pong['running'] = True
+            threading.Thread(target=_pong_loop, daemon=True).start()
+    return jsonify(ok=True)
+
+@app.route('/api/pong/state', methods=['GET'])
+@login_required
+def pong_state():
+    return jsonify(**_pong_state_dict())
 
 @app.route('/api/pong/paddle', methods=['POST'])
 @login_required
@@ -3299,14 +3477,202 @@ def pong_paddle():
 @login_required
 def pong_reset():
     with _pong_lock:
-        _pong['score_l'] = 0
-        _pong['score_r'] = 0
-        _pong['players'] = {}
+        _pong['score_l'] = 0; _pong['score_r'] = 0
+        _pong['right_human'] = False
         _pong['running'] = False
         b = _pong['ball']
         b['x'], b['y'] = 0.5, 0.5
-        b['vx'], b['vy'] = 0.012, 0.008
+        b['vx'], b['vy'] = 0.014, 0.008
     return jsonify(ok=True)
+
+@app.route('/api/pong/challenge', methods=['POST'])
+@login_required
+def pong_challenge():
+    """Freund fordert uns heraus — schicke Notification und markiere right_human."""
+    with _pong_lock:
+        _pong['right_human'] = True
+    # Notification an PC
+    try:
+        from winotify import Notification
+        toast = Notification(app_id="BMO", title="🏓 Pong-Challenge!", msg="Dein Freund fordert dich heraus!")
+        toast.show()
+    except Exception:
+        pass
+    return jsonify(ok=True)
+
+@app.route('/api/friend/pong/state')
+@login_required
+def friend_pong_state():
+    if "HIER_FREUND_IP" in FRIEND_URL:
+        return jsonify(running=False, error="FRIEND_URL nicht konfiguriert.")
+    try:
+        r = req.get(f"{FRIEND_URL}/api/admin/pong/state", timeout=3)
+        return jsonify(**r.json())
+    except Exception as e:
+        return jsonify(running=False, error=str(e))
+
+@app.route('/api/friend/pong/paddle', methods=['POST'])
+@login_required
+def friend_pong_paddle():
+    if "HIER_FREUND_IP" in FRIEND_URL:
+        return jsonify(ok=False, error="FRIEND_URL nicht konfiguriert.")
+    try:
+        r = req.post(f"{FRIEND_URL}/api/admin/pong/paddle", json=request.json or {}, timeout=2)
+        return jsonify(**r.json())
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
+
+@app.route('/api/friend/pong/challenge', methods=['POST'])
+@login_required
+def friend_pong_challenge():
+    if "HIER_FREUND_IP" in FRIEND_URL:
+        return jsonify(ok=False, error="FRIEND_URL nicht konfiguriert.")
+    try:
+        r = req.post(f"{FRIEND_URL}/api/admin/pong/challenge", timeout=5)
+        return jsonify(**r.json())
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
+
+@app.route('/api/friend/processes')
+@login_required
+def friend_processes():
+    if "HIER_FREUND_IP" in FRIEND_URL:
+        return jsonify(error="FRIEND_URL nicht konfiguriert.")
+    try:
+        r = req.get(f"{FRIEND_URL}/api/admin/processes", timeout=5)
+        return jsonify(**r.json())
+    except Exception as e:
+        return jsonify(error=str(e))
+
+@app.route('/api/friend/processes/<int:pid>/kill', methods=['POST'])
+@login_required
+def friend_kill_process(pid):
+    if "HIER_FREUND_IP" in FRIEND_URL:
+        return jsonify(ok=False, error="FRIEND_URL nicht konfiguriert.")
+    try:
+        r = req.post(f"{FRIEND_URL}/api/admin/processes/{pid}/kill", timeout=5)
+        return jsonify(**r.json())
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
+
+# ── ADMIN ROUTEN (kein Login nötig — für Freunde) ─────────────────
+_admin_enabled = False
+
+@app.route('/api/admin/toggle', methods=['POST'])
+@login_required
+def admin_toggle():
+    global _admin_enabled
+    _admin_enabled = not _admin_enabled
+    log.info(f"Admin-Zugriff: {'AN' if _admin_enabled else 'AUS'}")
+    return jsonify(enabled=_admin_enabled)
+
+def _admin_check():
+    if not _admin_enabled:
+        from flask import abort
+        abort(403)
+
+@app.route('/api/admin/pong/state')
+def admin_pong_state():
+    _admin_check()
+    return jsonify(**_pong_state_dict())
+
+@app.route('/api/admin/pong/paddle', methods=['POST'])
+def admin_pong_paddle():
+    _admin_check()
+    data = request.json or {}
+    side = data.get('side')
+    y    = max(0.08, min(0.92, float(data.get('y', 0.5))))
+    with _pong_lock:
+        if side in ('left', 'right'):
+            _pong[side] = y
+    return jsonify(ok=True)
+
+@app.route('/api/admin/pong/challenge', methods=['POST'])
+def admin_pong_challenge():
+    _admin_check()
+    with _pong_lock:
+        _pong['right_human'] = True
+        if not _pong['running']:
+            _pong['running'] = True
+            threading.Thread(target=_pong_loop, daemon=True).start()
+    return jsonify(ok=True)
+
+@app.route('/api/admin/jumpscare', methods=['POST'])
+def admin_jumpscare():
+    _admin_check()
+    try:
+        import subprocess as _sp
+        _sp.Popen(['python', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bmo_jumpscare.py')],
+                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    except Exception:
+        pass
+    return jsonify(ok=True)
+
+@app.route('/api/admin/screen')
+def admin_screen():
+    _admin_check()
+    if not _SCREEN_OK:
+        return jsonify(error="Pillow nicht installiert"), 503
+    return Response(_screen_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/admin/notify', methods=['POST'])
+def admin_notify():
+    _admin_check()
+    data    = request.json or {}
+    title   = str(data.get('title', 'BMO'))[:64]
+    message = str(data.get('message', ''))[:256]
+    if not message:
+        return jsonify(ok=False, error="Keine Nachricht.")
+    try:
+        try:
+            from winotify import Notification
+            toast = Notification(app_id="BMO", title=title, msg=message)
+            toast.show()
+        except ImportError:
+            t = title.replace('"','').replace("'",'')
+            m = message.replace('"','').replace("'",'')
+            ps = (
+                'Add-Type -AssemblyName System.Windows.Forms;'
+                '$n=New-Object System.Windows.Forms.NotifyIcon;'
+                '$n.Icon=[System.Drawing.SystemIcons]::Information;'
+                '$n.Visible=$true;'
+                f'$n.ShowBalloonTip(4000,\'{t}\',\'{m}\',[System.Windows.Forms.ToolTipIcon]::Info);'
+                'Start-Sleep 5; $n.Dispose()'
+            )
+            subprocess.Popen(['powershell', '-WindowStyle', 'Hidden', '-Command', ps])
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
+
+@app.route('/api/admin/processes')
+def admin_processes():
+    _admin_check()
+    procs = []
+    for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+        try:
+            info = p.info
+            procs.append({'pid': info['pid'], 'name': info['name'] or '?',
+                          'cpu': round(info['cpu_percent'] or 0, 1),
+                          'mem': round(info['memory_percent'] or 0, 1)})
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    procs.sort(key=lambda x: x['mem'], reverse=True)
+    return jsonify(processes=procs[:80])
+
+@app.route('/api/admin/processes/<int:pid>/kill', methods=['POST'])
+def admin_kill_process(pid):
+    _admin_check()
+    try:
+        p = psutil.Process(pid)
+        name = p.name()
+        p.terminate()
+        return jsonify(ok=True, name=name)
+    except psutil.NoSuchProcess:
+        return jsonify(ok=False, error="Prozess nicht gefunden.")
+    except psutil.AccessDenied:
+        return jsonify(ok=False, error="Zugriff verweigert.")
+    except Exception as e:
+        return jsonify(ok=False, error=str(e))
 
 # ── START ──────────────────────────────────────────────────────────
 if __name__ == '__main__':

@@ -27,8 +27,8 @@ if not exist "%~dp0..\bmo_python.txt" (
 
 :: Gespeicherten Python-Pfad laden
 set "PYEXE="
-if exist "%~dp0bmo_python.txt" (
-  set /p PYEXE=<"%~dp0bmo_python.txt"
+if exist "%~dp0..\bmo_python.txt" (
+  set /p PYEXE=<"%~dp0..\bmo_python.txt"
 )
 
 :: Falls kein gespeicherter Pfad, pythonw aus PATH versuchen
