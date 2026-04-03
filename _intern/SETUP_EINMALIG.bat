@@ -17,7 +17,7 @@ echo   Installiere benoetigte Pakete...
 echo   (benutzt Python das dieses Skript ausfuehrt)
 echo.
 
-python -m pip install flask flask-cors requests psutil feedparser pillow pygame sounddevice soundfile speechrecognition openwakeword spotipy ollama
+python -m pip install flask flask-cors requests psutil feedparser pillow pygame sounddevice soundfile speechrecognition openwakeword spotipy ollama mss pyautogui winotify
 
 echo.
 echo  ========================================
