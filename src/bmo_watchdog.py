@@ -99,9 +99,6 @@ while True:
         start_core()
         time.sleep(CORE_DELAY)
         # Web auch neu starten falls es läuft (hängt am Core)
-        if is_running(web_proc):
-            web_proc.terminate()
-            web_proc = None
         start_web()
     elif not is_running(web_proc):
         log.warning("Web ist abgestürzt! Neustart...")
