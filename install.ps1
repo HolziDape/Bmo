@@ -118,8 +118,8 @@ if ([string]::IsNullOrWhiteSpace($userInput)) {
 }
 Write-OK "Installiere nach: $installDir"
 
-if (Test-Path $installDir) {
-    Write-Info "Ordner existiert bereits — wird aktualisiert (git pull)..."
+if ((Test-Path $installDir) -and (Test-Path (Join-Path $installDir ".git"))) {
+    Write-Info "BMO bereits installiert — wird aktualisiert (git pull)..."
     Set-Location $installDir
     & git pull
 } else {
