@@ -107,9 +107,19 @@ if (-not $ollamaOk) {
 # ── 4. Repo klonen ────────────────────────────────────────────────────────────
 Write-Header "Schritt 4: BMO herunterladen"
 
-$installDir = Join-Path $HOME "BMO"
+$defaultDir = Join-Path $HOME "BMO"
+Write-Host "  Wo soll BMO installiert werden?" -ForegroundColor White
+Write-Host "  [ENTER druecken fuer Standard: $defaultDir]" -ForegroundColor DarkGray
+$userInput = Read-Host "  Pfad"
+if ([string]::IsNullOrWhiteSpace($userInput)) {
+    $installDir = $defaultDir
+} else {
+    $installDir = $userInput.Trim('"').Trim("'")
+}
+Write-OK "Installiere nach: $installDir"
+
 if (Test-Path $installDir) {
-    Write-Info "Ordner '$installDir' existiert bereits — wird aktualisiert (git pull)..."
+    Write-Info "Ordner existiert bereits — wird aktualisiert (git pull)..."
     Set-Location $installDir
     & git pull
 } else {
