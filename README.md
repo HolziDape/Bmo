@@ -6,6 +6,18 @@ Inspiriert von BMO aus Adventure Time. Läuft lokal auf Windows — kein Cloud-Z
 
 ---
 
+## ⚡ Schnell-Installation (empfohlen)
+
+**PowerShell** öffnen (`Win + X` → „Windows PowerShell") und diesen Befehl einfügen:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/HolziDape/Bmo/main/install.ps1 | iex"
+```
+
+> Das Skript installiert automatisch: Python, Git, Ollama, alle Pakete und das KI-Modell — dann öffnet sich der BMO-Ordner.
+
+---
+
 ## ✨ Features
 
 | Feature | Beschreibung |
