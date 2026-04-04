@@ -2828,7 +2828,7 @@ async function challengeFriendPong(idx) {
     const r = await fetch(`/api/friend/${_selectedFriendIdx}/pong/challenge`, {method:'POST'});
     const d = await r.json();
     if (d.ok) {
-      showPong(false);  // Admin = linkes Paddle, Pong starten
+      showPong(false, true);  // Admin = linkes Paddle, right_human=true für Freund
     } else {
       addMsg('⛔ ' + (d.error || 'Pong-Herausforderung fehlgeschlagen.'), 'sys');
     }
@@ -2842,10 +2842,10 @@ let _pongActive = false, _pongRAF = null, _pongPoll = null;
 let _myPaddleY = 0.5;
 let _pongFriendMode = false;  // true = wir sind rechts (Freund-Herausforderung)
 
-async function showPong(friendJoin = false) {
+async function showPong(friendJoin = false, rightHuman = false) {
   _pongFriendMode = friendJoin;
   if (!friendJoin) {
-    await fetch('/api/pong/start', {method:'POST'}).catch(()=>{});
+    await fetch('/api/pong/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({right_human: rightHuman})}).catch(()=>{});
   }
   _pongActive = true;
   document.getElementById('pongOverlay').classList.add('show');
@@ -3673,9 +3673,11 @@ def _pong_state_dict():
 @app.route('/api/pong/start', methods=['POST'])
 @login_required
 def pong_start():
+    data = request.json or {}
+    right_human = bool(data.get('right_human', False))
     with _pong_lock:
         _pong['score_l'] = 0; _pong['score_r'] = 0
-        _pong['right_human'] = False
+        _pong['right_human'] = right_human
         b = _pong['ball']
         _reset_ball(b, 1 if _random.random() > 0.5 else -1)
         if not _pong['running']:
