@@ -3899,12 +3899,10 @@ def _admin_check():
 
 @app.route('/api/admin/pong/state')
 def admin_pong_state():
-    _admin_check()
     return jsonify(**_pong_state_dict())
 
 @app.route('/api/admin/pong/paddle', methods=['POST'])
 def admin_pong_paddle():
-    _admin_check()
     data = request.json or {}
     side = data.get('side')
     y    = max(0.08, min(0.92, float(data.get('y', 0.5))))
@@ -3916,7 +3914,6 @@ def admin_pong_paddle():
 @app.route('/api/admin/pong/challenge', methods=['POST'])
 def admin_pong_challenge():
     global _pong_pending
-    _admin_check()
     with _pong_lock:
         _pong['right_human'] = True
         if not _pong['running']:
