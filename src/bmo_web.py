@@ -27,6 +27,7 @@ log = logging.getLogger("BMO-Web")
 
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 from flask_cors import CORS
+from flask_socketio import SocketIO
 import requests as req
 import psutil
 import datetime
@@ -58,6 +59,7 @@ except ImportError:
 
 app  = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 PORT       = 5000
 CORE_URL   = "http://localhost:6000"
@@ -1191,8 +1193,9 @@ HTML = """<!DOCTYPE html>
     <button class="qbtn" onclick="showProcesses()" style="border-color:#fb923c;color:#fdba74;">
       <span class="icon">📋</span>Prozesse
     </button>
-    <button class="qbtn" onclick="showSpiele()" style="border-color:#22c55e;color:#4ade80;">
+    <button class="qbtn" onclick="showSpiele()" style="border-color:#22c55e;color:#4ade80;position:relative;">
       <span class="icon">🎮</span>Spiele
+      <span id="pongBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:700;align-items:center;justify-content:center;animation:pulse .8s infinite;">!</span>
     </button>
     <button class="qbtn friend" onclick="showFreunde()">
       <span class="icon">👥</span>Freunde
@@ -2841,14 +2844,28 @@ async function challengeFriendPong(idx) {
 let _pongActive = false, _pongRAF = null, _pongPoll = null;
 let _myPaddleY = 0.5;
 let _pongFriendMode = false;  // true = wir sind rechts (Freund-Herausforderung)
+let _pongDisconnectHandled = false;
 
 async function showPong(friendJoin = false, rightHuman = false) {
   _pongFriendMode = friendJoin;
+  _pongDisconnectHandled = false;
+  document.getElementById('pongOverlay').classList.add('show');
+  // Prüfen ob Freund uns bereits eingeladen hat
+  if (!friendJoin && !rightHuman) {
+    try {
+      const r = await fetch('/api/pong/pending');
+      const d = await r.json();
+      if (d.pending) {
+        document.getElementById('pongBadge').style.display = 'none';
+        document.getElementById('pongChallengeBanner').style.display = 'block';
+        return;
+      }
+    } catch(e) {}
+  }
   if (!friendJoin) {
     await fetch('/api/pong/start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({right_human: rightHuman})}).catch(()=>{});
   }
   _pongActive = true;
-  document.getElementById('pongOverlay').classList.add('show');
   document.getElementById('pongInfo').textContent =
     friendJoin ? '🟠 Du = rechtes Paddle (Maus/Touch)' : '🟢 Du = linkes Paddle (Maus/Touch)';
   _startPongInput();
@@ -2862,8 +2879,10 @@ function closePong() {
 }
 async function acceptPongChallenge() {
   document.getElementById('pongChallengeBanner').style.display = 'none';
+  document.getElementById('pongBadge').style.display = 'none';
   await fetch('/api/pong/accept', {method:'POST'}).catch(()=>{});
   _pongFriendMode = false;
+  _pongDisconnectHandled = false;
   _pongActive = true;
   document.getElementById('pongOverlay').classList.add('show');
   document.getElementById('pongInfo').textContent = '🟢 Du = linkes Paddle (Maus/Touch)';
@@ -2871,17 +2890,15 @@ async function acceptPongChallenge() {
   _startPongRender();
 }
 
-// Polling: prüfen ob Freund uns herausfordert
+// Polling: prüfen ob Freund uns herausfordert — Badge zeigen, Overlay NICHT automatisch öffnen
 setInterval(async () => {
   try {
-    const r = await fetch('/api/pong/pending');
+    const r = await fetch('/api/pong/pending/peek');
     const d = await r.json();
-    if (d.pending) {
-      document.getElementById('pongChallengeBanner').style.display = 'block';
-      document.getElementById('pongOverlay').classList.add('show');
-    }
+    const badge = document.getElementById('pongBadge');
+    badge.style.display = d.pending ? 'flex' : 'none';
   } catch(e) {}
-}, 5000);
+}, 1000);
 
 async function pongReset() {
   closePong();
@@ -2921,6 +2938,16 @@ function _startPongRender() {
   function loop() {
     if (!_pongActive) return;
     if (frame++ % 2 === 0) fetchState();
+    // Disconnect-Erkennung
+    if (state && state.opponent_left && !_pongDisconnectHandled) {
+      _pongDisconnectHandled = true;
+      const who = state.opponent_left === 'right' ? 'Freund' : 'Gegner';
+      document.getElementById('pongInfo').textContent = `⚠️ ${who} hat das Spiel verlassen.`;
+      _pongActive = false;
+      if (_pongPoll) { clearInterval(_pongPoll); _pongPoll = null; }
+      setTimeout(() => document.getElementById('pongOverlay').classList.remove('show'), 3000);
+      return;
+    }
     ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, W, H);
     ctx.setLineDash([8, 12]); ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
@@ -3623,7 +3650,11 @@ _pong = {
     'right_human': False,  # True wenn Freund rechts spielt
     'friend_ready':    False,   # True sobald Freund beigetreten ist
     'countdown_until': 0.0,    # time.time() + 3 wenn Countdown läuft
+    'left_last_seen':  0.0,    # Letzter Paddle-Update vom Admin
+    'right_last_seen': 0.0,    # Letzter Paddle-Update vom Freund
+    'opponent_left':   '',     # 'left' oder 'right' wenn jemand getrennt wurde
 }
+_PONG_DISCONNECT_TIMEOUT = 8.0
 
 def _reset_ball(b, direction):
     b['x'], b['y'] = 0.5, 0.5
@@ -3687,6 +3718,19 @@ def _pong_loop():
             rh = _pong['right_human']
             fr = _pong['friend_ready']
             cu = _pong['countdown_until']
+            # Disconnect-Erkennung: nur im Multiplayer wenn Countdown vorbei
+            if rh and fr and _time.time() > cu:
+                now = _time.time()
+                lls = _pong['left_last_seen']
+                rls = _pong['right_last_seen']
+                if lls > 0 and now - lls > _PONG_DISCONNECT_TIMEOUT:
+                    _pong['opponent_left'] = 'left'
+                    _pong['running'] = False
+                elif rls > 0 and now - rls > _PONG_DISCONNECT_TIMEOUT:
+                    _pong['opponent_left'] = 'right'
+                    _pong['running'] = False
+        if not _pong['running']:
+            break
         if rh and not fr:
             # Warte auf Freund
             _time.sleep(0.1)
@@ -3696,6 +3740,10 @@ def _pong_loop():
             _time.sleep(0.016)
             continue
         _pong_step()
+        try:
+            socketio.emit('pong_state', _pong_state_dict())
+        except Exception:
+            pass
         _time.sleep(0.016)  # ~62 fps
 
 def _pong_state_dict():
@@ -3711,6 +3759,7 @@ def _pong_state_dict():
             right_human=_pong['right_human'],
             friend_ready=_pong['friend_ready'],
             countdown=cd,
+            opponent_left=_pong['opponent_left'],
         )
 
 @app.route('/api/pong/start', methods=['POST'])
@@ -3723,6 +3772,9 @@ def pong_start():
         _pong['right_human'] = right_human
         _pong['friend_ready'] = not right_human  # bei AI sofort ready
         _pong['countdown_until'] = _time.time() + 3 if not right_human else 0.0
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = _time.time()
+        _pong['right_last_seen'] = _time.time()
         b = _pong['ball']
         _reset_ball(b, 1 if _random.random() > 0.5 else -1)
         if not _pong['running']:
@@ -3744,6 +3796,7 @@ def pong_paddle():
     with _pong_lock:
         if side in ('left', 'right'):
             _pong[side] = y
+        _pong['left_last_seen'] = _time.time()
     return jsonify(ok=True)
 
 @app.route('/api/pong/reset', methods=['POST'])
@@ -3753,6 +3806,9 @@ def pong_reset():
         _pong['score_l'] = 0; _pong['score_r'] = 0
         _pong['right_human'] = False
         _pong['running'] = False
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = 0.0
+        _pong['right_last_seen'] = 0.0
         b = _pong['ball']
         b['x'], b['y'] = 0.5, 0.5
         b['vx'], b['vy'] = 0.014, 0.008
@@ -3768,6 +3824,9 @@ def pong_challenge():
         _pong['friend_ready'] = True   # Freund ist schon da
         _pong['countdown_until'] = _time.time() + 3
         _pong['score_l'] = 0; _pong['score_r'] = 0
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = _time.time()
+        _pong['right_last_seen'] = _time.time()
         b = _pong['ball']
         _reset_ball(b, 1 if _random.random() > 0.5 else -1)
         if not _pong['running']:
@@ -3792,6 +3851,14 @@ def pong_pending():
         _pong_pending = False
     return jsonify(pending=p)
 
+@app.route('/api/pong/pending/peek')
+@login_required
+def pong_pending_peek():
+    """Gibt pending-Status zurück OHNE ihn zu konsumieren."""
+    with _pong_pending_lock:
+        p = _pong_pending
+    return jsonify(pending=p)
+
 @app.route('/api/pong/accept', methods=['POST'])
 @login_required
 def pong_accept():
@@ -3799,6 +3866,9 @@ def pong_accept():
     with _pong_lock:
         _pong['friend_ready'] = True
         _pong['countdown_until'] = _time.time() + 3
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = _time.time()
+        _pong['right_last_seen'] = _time.time()
     return jsonify(ok=True)
 
 @app.route('/api/friend/<int:idx>/pong/state')
@@ -3980,6 +4050,9 @@ def admin_pong_join():
         _pong['right_human'] = True
         _pong['friend_ready'] = True
         _pong['countdown_until'] = _time.time() + 3
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = _time.time()
+        _pong['right_last_seen'] = _time.time()
     return jsonify(ok=True)
 
 @app.route('/api/admin/pong/paddle', methods=['POST'])
@@ -3990,7 +4063,24 @@ def admin_pong_paddle():
     with _pong_lock:
         if side in ('left', 'right'):
             _pong[side] = y
+        _pong['right_last_seen'] = _time.time()
     return jsonify(ok=True)
+
+@socketio.on('pong_paddle')
+def ws_pong_paddle(data):
+    """WebSocket-Handler: Paddle-Update vom Browser (niedrigere Latenz als HTTP POST)."""
+    try:
+        y    = max(0.08, min(0.92, float(data.get('y', 0.5))))
+        side = data.get('side', 'right')
+        with _pong_lock:
+            if side in ('left', 'right'):
+                _pong[side] = y
+            if side == 'right':
+                _pong['right_last_seen'] = _time.time()
+            elif side == 'left':
+                _pong['left_last_seen'] = _time.time()
+    except Exception:
+        pass
 
 @app.route('/api/admin/pong/challenge', methods=['POST'])
 def admin_pong_challenge():
@@ -4000,6 +4090,9 @@ def admin_pong_challenge():
         _pong['friend_ready'] = False  # Warte bis Admin annimmt
         _pong['countdown_until'] = 0.0
         _pong['score_l'] = 0; _pong['score_r'] = 0
+        _pong['opponent_left'] = ''
+        _pong['left_last_seen'] = _time.time()
+        _pong['right_last_seen'] = _time.time()
         b = _pong['ball']
         _reset_ball(b, 1 if _random.random() > 0.5 else -1)
         if not _pong['running']:
@@ -4107,4 +4200,4 @@ if __name__ == '__main__':
             time.sleep(1.5)
             webbrowser.open(f"http://localhost:{PORT}/setup")
         threading.Thread(target=_open_setup, daemon=True).start()
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    socketio.run(app, host='0.0.0.0', port=PORT, debug=False, allow_unsafe_werkzeug=True)
