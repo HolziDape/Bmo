@@ -108,6 +108,12 @@ def _ensure_points_secret() -> str:
 
 _POINTS_SECRET_ADMIN = _ensure_points_secret()
 
+# ── DRAW STATE ──────────────────────────────────────────────────────────────
+_draw_strokes_for_friend: list = []   # Admin → Freund Striche
+_draw_strokes_from_friend: list = []  # Freund → Admin Striche (für tkinter)
+_draw_lock = threading.Lock()
+_draw_window_open = False
+
 def _points_sign(points: int) -> str:
     return _hmac.new(_POINTS_SECRET_ADMIN.encode(), str(int(points)).encode(), _hashlib.sha256).hexdigest()
 
@@ -1000,7 +1006,112 @@ def route_points_verify():
     return jsonify(points=points, corrected=False)
 
 
+@app.route('/api/draw/open', methods=['POST'])
+def route_draw_open():
+    """Freund hat screen_draw gekauft — öffnet tkinter-Canvas auf Admin-Monitor."""
+    global _draw_window_open, _draw_strokes_from_friend
+    with _draw_lock:
+        _draw_strokes_from_friend = []
+        _draw_window_open = True
+    threading.Thread(target=_run_draw_window, daemon=True).start()
+    return jsonify(ok=True)
+
+@app.route('/api/draw/stroke', methods=['POST'])
+def route_draw_stroke():
+    """Empfängt Strich vom Freund → Admin-tkinter rendert ihn."""
+    data = request.get_json(silent=True) or {}
+    with _draw_lock:
+        if _draw_window_open:
+            _draw_strokes_from_friend.append(data)
+    return jsonify(ok=True)
+
+@app.route('/api/draw/strokes', methods=['GET'])
+def route_draw_strokes():
+    """Freund pollt Admin-Striche (Admin→Freund Richtung)."""
+    with _draw_lock:
+        strokes = list(_draw_strokes_for_friend)
+        _draw_strokes_for_friend.clear()
+    return jsonify(strokes=strokes)
+
+@app.route('/api/draw/friend-stroke', methods=['POST'])
+def route_draw_friend_stroke():
+    """Admin sendet Strich an Freund-Browser."""
+    data = request.get_json(silent=True) or {}
+    with _draw_lock:
+        _draw_strokes_for_friend.append(data)
+    return jsonify(ok=True)
+
+@app.route('/api/draw/close', methods=['POST'])
+def route_draw_close():
+    """Schließt Draw-Session."""
+    global _draw_window_open
+    with _draw_lock:
+        _draw_window_open = False
+        _draw_strokes_from_friend.clear()
+        _draw_strokes_for_friend.clear()
+    return jsonify(ok=True)
+
+
 # ── START ───────────────────────────────────────────────────────────────────
+def _run_draw_window():
+    """Öffnet transparentes tkinter-Overlay auf dem Admin-Monitor (Freund malt drauf)."""
+    global _draw_window_open
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.attributes('-fullscreen', True)
+        root.attributes('-topmost', True)
+        root.attributes('-alpha', 0.7)
+        root.configure(bg='black')
+        root.overrideredirect(True)
+
+        canvas = tk.Canvas(root, bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        tk.Label(root, text='Freund malt... (Klick zum Schließen)',
+                 bg='black', fg='#4ade80', font=('Arial', 14)).place(x=10, y=10)
+
+        def close(_=None):
+            global _draw_window_open
+            _draw_window_open = False
+            root.destroy()
+
+        root.bind('<Button-1>', close)
+        root.bind('<Escape>', close)
+        root.after(60000, close)
+
+        last_x = last_y = None
+
+        def poll_strokes():
+            nonlocal last_x, last_y
+            with _draw_lock:
+                strokes = list(_draw_strokes_from_friend)
+                _draw_strokes_from_friend.clear()
+            for s in strokes:
+                sw = root.winfo_screenwidth()
+                sh = root.winfo_screenheight()
+                x = int(s.get('x', 0) * sw)
+                y = int(s.get('y', 0) * sh)
+                if s.get('type') == 'move' and last_x is not None:
+                    canvas.create_line(last_x, last_y, x, y,
+                                       fill=s.get('color', '#ef4444'),
+                                       width=int(s.get('w', 4)),
+                                       smooth=True, capstyle='round')
+                last_x, last_y = x, y
+                if s.get('type') == 'up':
+                    last_x = last_y = None
+            if not _draw_window_open:
+                root.destroy()
+                return
+            root.after(100, poll_strokes)
+
+        root.after(100, poll_strokes)
+        root.mainloop()
+    except Exception as e:
+        log.error(f'Draw-Fenster Fehler: {e}')
+    finally:
+        _draw_window_open = False
+
 def _warmup_ollama():
     """Lädt das Ollama-Modell vorab in den RAM — erster Prompt wird schnell."""
     try:
