@@ -41,13 +41,19 @@ log = logging.getLogger("BMO-Core")
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import ollama
+try:
+    import ollama as _ollama_lib
+except ImportError:
+    _ollama_lib = None
 import psutil
 import datetime
 import requests
 import json
 import random
 import threading
+import hmac as _hmac
+import hashlib as _hashlib
+import secrets as _secrets
 import base64
 import tempfile
 import subprocess
@@ -76,6 +82,69 @@ RVC_INDEX         = os.path.join(BASE_DIR, "_intern", "models",  "BMO.index")
 SOUNDS_BASE       = os.path.join(BASE_DIR, "assets",  "sounds")
 SHUTDOWN_DIR      = os.path.join(SOUNDS_BASE, "shutdown")
 CONVERSATIONS_PATH = os.path.join(BASE_DIR, "_intern", "data",   "conversations.json")
+
+BMO_CONFIG_PATH = os.path.join(BASE_DIR, "_intern", "bmo_config.txt")
+DATA_DIR        = os.path.join(BASE_DIR, "_intern", "data")
+
+def _read_bmo_config() -> dict:
+    cfg = {}
+    if os.path.exists(BMO_CONFIG_PATH):
+        with open(BMO_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    k, v = line.split('=', 1)
+                    cfg[k.strip()] = v.strip()
+    return cfg
+
+def _write_bmo_config(cfg: dict):
+    with open(BMO_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        for k, v in cfg.items():
+            f.write(f'{k}={v}\n')
+
+def _ensure_points_secret() -> str:
+    cfg = _read_bmo_config()
+    if 'POINTS_SECRET' not in cfg:
+        cfg['POINTS_SECRET'] = _secrets.token_hex(32)
+        _write_bmo_config(cfg)
+    return cfg['POINTS_SECRET']
+
+_POINTS_SECRET_ADMIN = _ensure_points_secret()
+
+LITE_MODE = _read_bmo_config().get('LITE_MODE', 'false').lower() == 'true'
+if LITE_MODE:
+    log.info("LITE-MODE aktiv — Ollama, TTS und Wake-Word deaktiviert.")
+
+# ── DRAW STATE ──────────────────────────────────────────────────────────────
+_draw_strokes_for_friend: list = []   # Admin → Freund Striche
+_draw_strokes_from_friend: list = []  # Freund → Admin Striche (für tkinter)
+_draw_lock = threading.Lock()
+_draw_window_open = False
+
+def _points_sign(points: int) -> str:
+    return _hmac.new(_POINTS_SECRET_ADMIN.encode(), str(int(points)).encode(), _hashlib.sha256).hexdigest()
+
+def _points_verify(points: int, sig: str) -> bool:
+    return _hmac.compare_digest(_points_sign(points), sig)
+
+def _save_points(points: int, freund_id: str):
+    import re, json
+    safe_id = re.sub(r'[^a-zA-Z0-9.\-]', '_', freund_id)[:64]
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(os.path.join(DATA_DIR, f'points_{safe_id}.json'), 'w', encoding='utf-8') as f:
+        json.dump({'points': points, 'freund_id': freund_id}, f)
+
+def _load_points(freund_id: str) -> int:
+    import re, json
+    safe_id = re.sub(r'[^a-zA-Z0-9.\-]', '_', freund_id)[:64]
+    path = os.path.join(DATA_DIR, f'points_{safe_id}.json')
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f).get('points', 0)
+        except (json.JSONDecodeError, ValueError):
+            return 0
+    return 0
 
 SPOTIFY_CLIENT_ID     = "365b371ad2c7483ea7dda2029869c3a3"
 SPOTIFY_CLIENT_SECRET = "2c6b2968fbb9425792b99355b03b65ac"
@@ -570,7 +639,7 @@ def process_text(text: str, remote: bool = False) -> tuple:
     messages.append({'role': 'user', 'content': text})
 
     try:
-        response = ollama.chat(model=OLLAMA_MODEL, messages=messages)
+        response = _ollama_lib.chat(model=OLLAMA_MODEL, messages=messages)
         content  = response['message']['content']
     except Exception as e:
         return f"Ollama ist gerade nicht erreichbar: {e}", None, {}
@@ -665,6 +734,8 @@ def save_conversation(user_text, bmo_text):
 @app.route('/process', methods=['POST'])
 def route_process():
     """Hauptendpunkt: Text rein → Antwort + action raus."""
+    if LITE_MODE or _ollama_lib is None:
+        return jsonify(response="KI nicht verfügbar im Lite-Mode."), 503
     data = request.json or {}
     text = (data.get('message') or data.get('text') or '').strip()
     remote = bool(data.get('remote', False))
@@ -678,6 +749,8 @@ def route_process():
 @app.route('/transcribe', methods=['POST'])
 def route_transcribe():
     """Audio (base64 webm/wav) → Transkript + Antwort + action."""
+    if LITE_MODE or _ollama_lib is None:
+        return jsonify(response="KI nicht verfügbar im Lite-Mode."), 503
     data = request.json or {}
     b64  = data.get('audio', '')
     fmt  = data.get('format', 'webm')
@@ -845,13 +918,15 @@ def route_spotify_volume():
 @app.route('/photo', methods=['POST'])
 def route_photo():
     """Bild (base64 JPEG) + optionale Frage → BMO beschreibt das Bild via Vision-Modell."""
+    if LITE_MODE or _ollama_lib is None:
+        return jsonify(response="KI nicht verfügbar im Lite-Mode."), 503
     data     = request.json or {}
     b64      = data.get('image', '')
     question = data.get('question', 'Was siehst du auf diesem Bild? Beschreibe es kurz auf Deutsch.')
     if not b64:
         return jsonify(response="Kein Bild empfangen.", action=None)
     try:
-        response = ollama.chat(
+        response = _ollama_lib.chat(
             model=VISION_MODEL,
             messages=[{
                 'role':    'user',
@@ -926,12 +1001,165 @@ def route_ping():
     return jsonify(status="ok", version="1.0", port=PORT)
 
 
+@app.route('/api/points/verify', methods=['POST'])
+def route_points_verify():
+    """Empfängt und verifiziert Punkte-Stand vom Freund-Server."""
+    data      = request.get_json(silent=True) or {}
+    try:
+        points = int(data.get('points', 0))
+    except (ValueError, TypeError):
+        return jsonify(error='Ungültiger Punktestand'), 400
+    freund_id = data.get('freund_id', 'unknown')
+
+    stored = _load_points(freund_id)
+    # Erlaubt: Stand stimmt mit gespeichertem überein oder ist höher (Punkte verdient)
+    # Ablehnen: Stand ist niedriger als gespeichert (hätte schon abgezogen sein müssen)
+    if points < stored:
+        # Manipulation erkannt: gespeicherten Stand zurückspielen
+        return jsonify(points=stored, corrected=True)
+
+    _save_points(points, freund_id)
+    return jsonify(points=points, corrected=False)
+
+
+@app.route('/api/draw/open', methods=['POST'])
+def route_draw_open():
+    """Freund hat screen_draw gekauft — öffnet tkinter-Canvas auf Admin-Monitor."""
+    global _draw_window_open, _draw_strokes_from_friend
+    with _draw_lock:
+        _draw_strokes_from_friend = []
+        _draw_window_open = True
+    threading.Thread(target=_run_draw_window, daemon=True).start()
+    return jsonify(ok=True)
+
+@app.route('/api/draw/stroke', methods=['POST'])
+def route_draw_stroke():
+    """Empfängt Strich vom Freund → Admin-tkinter rendert ihn."""
+    data = request.get_json(silent=True) or {}
+    with _draw_lock:
+        if _draw_window_open:
+            _draw_strokes_from_friend.append(data)
+    return jsonify(ok=True)
+
+@app.route('/api/draw/strokes', methods=['GET'])
+def route_draw_strokes():
+    """Freund pollt Admin-Striche (Admin→Freund Richtung)."""
+    with _draw_lock:
+        strokes = list(_draw_strokes_for_friend)
+        _draw_strokes_for_friend.clear()
+    return jsonify(strokes=strokes)
+
+@app.route('/api/draw/friend-stroke', methods=['POST'])
+def route_draw_friend_stroke():
+    """Admin sendet Strich an Freund-Browser."""
+    data = request.get_json(silent=True) or {}
+    with _draw_lock:
+        _draw_strokes_for_friend.append(data)
+    return jsonify(ok=True)
+
+@app.route('/api/draw/close', methods=['POST'])
+def route_draw_close():
+    """Schließt Draw-Session."""
+    global _draw_window_open
+    with _draw_lock:
+        _draw_window_open = False
+        _draw_strokes_from_friend.clear()
+        _draw_strokes_for_friend.clear()
+    return jsonify(ok=True)
+
+
+@app.route('/lite-mode', methods=['GET'])
+def route_lite_mode_get():
+    return jsonify(lite_mode=LITE_MODE)
+
+@app.route('/lite-mode', methods=['POST'])
+def route_lite_mode_set():
+    """Schaltet Lite-Mode ein/aus (Neustart empfohlen)."""
+    global LITE_MODE
+    data   = request.get_json(silent=True) or {}
+    enable = data.get('enable', not LITE_MODE)
+    cfg    = _read_bmo_config()
+    cfg['LITE_MODE'] = 'true' if enable else 'false'
+    _write_bmo_config(cfg)
+    LITE_MODE = enable
+    log.info(f"Lite-Mode {'aktiviert' if enable else 'deaktiviert'}. Neustart empfohlen.")
+    return jsonify(lite_mode=enable, restart_required=True)
+
+
 # ── START ───────────────────────────────────────────────────────────────────
+def _run_draw_window():
+    """Öffnet transparentes tkinter-Overlay auf dem Admin-Monitor (Freund malt drauf)."""
+    global _draw_window_open
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.attributes('-fullscreen', True)
+        root.attributes('-topmost', True)
+        root.attributes('-alpha', 0.7)
+        root.configure(bg='black')
+        root.overrideredirect(True)
+
+        canvas = tk.Canvas(root, bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        tk.Label(root, text='Freund malt... (Klick zum Schließen)',
+                 bg='black', fg='#4ade80', font=('Arial', 14)).place(x=10, y=10)
+
+        def close(_=None):
+            global _draw_window_open
+            _draw_window_open = False
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+        root.bind('<Button-1>', close)
+        root.bind('<Escape>', close)
+        root.after(60000, close)
+
+        last_x = last_y = None
+
+        def poll_strokes():
+            nonlocal last_x, last_y
+            with _draw_lock:
+                strokes = list(_draw_strokes_from_friend)
+                _draw_strokes_from_friend.clear()
+            for s in strokes:
+                sw = root.winfo_screenwidth()
+                sh = root.winfo_screenheight()
+                x = int(s.get('x', 0) * sw)
+                y = int(s.get('y', 0) * sh)
+                if s.get('type') == 'move' and last_x is not None:
+                    canvas.create_line(last_x, last_y, x, y,
+                                       fill=s.get('color', '#ef4444'),
+                                       width=int(s.get('w', 4)),
+                                       smooth=True, capstyle='round')
+                last_x, last_y = x, y
+                if s.get('type') == 'up':
+                    last_x = last_y = None
+            if not _draw_window_open:
+                try:
+                    root.destroy()
+                except Exception:
+                    pass
+                return
+            root.after(100, poll_strokes)
+
+        root.after(100, poll_strokes)
+        root.mainloop()
+    except Exception as e:
+        log.error(f'Draw-Fenster Fehler: {e}')
+    finally:
+        _draw_window_open = False
+
 def _warmup_ollama():
     """Lädt das Ollama-Modell vorab in den RAM — erster Prompt wird schnell."""
     try:
         log.info(f"Ollama Warmup: Lade {OLLAMA_MODEL} vor...")
-        ollama.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": "hi"}])
+        if _ollama_lib is None:
+            log.info("Ollama nicht verfügbar (Lite-Mode oder nicht installiert).")
+            return
+        _ollama_lib.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": "hi"}])
         log.info("Ollama Warmup abgeschlossen — Modell bereit.")
     except Exception as e:
         log.warning(f"Ollama Warmup fehlgeschlagen (Ollama läuft?): {e}")
@@ -939,5 +1167,12 @@ def _warmup_ollama():
 if __name__ == '__main__':
     log.info("BMO Core startet...")
     log.info(f"Port: {PORT} | Modell: {OLLAMA_MODEL} | Whisper: {WHISPER_MODEL_SIZE}")
-    threading.Thread(target=_warmup_ollama, daemon=True).start()
-    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+    if not LITE_MODE:
+        threading.Thread(target=_warmup_ollama, daemon=True).start()
+    try:
+        from waitress import serve
+        log.info("Nutze waitress als WSGI-Server (stabil, kein Keep-Alive-Problem)")
+        serve(app, host='0.0.0.0', port=PORT, threads=4)
+    except ImportError:
+        log.warning("waitress nicht installiert — nutze Werkzeug (pip install waitress empfohlen)")
+        app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
