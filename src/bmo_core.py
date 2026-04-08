@@ -764,45 +764,45 @@ def route_transcribe():
     if not b64:
         return jsonify(transcript='', response='Kein Audio empfangen.', action=None)
 
-    audio_bytes = base64.b64decode(b64)
-    suffix = '.wav' if fmt == 'wav' else '.webm'
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-        f.write(audio_bytes)
-        in_path = f.name
-
-    wav_path = in_path.rsplit('.', 1)[0] + '_conv.wav'
-    try:
-        subprocess.run(
-            ['ffmpeg', '-y', '-i', in_path, '-ar', '16000', '-ac', '1', wav_path],
-            capture_output=True, timeout=15
-        )
-    except:
-        wav_path = in_path
-
-    transcript = ''
-    try:
-        wm     = get_whisper()
-        result = wm.transcribe(wav_path, language="de", fp16=False,
-                               temperature=0.0, no_speech_threshold=0.7,
-                               condition_on_previous_text=False)
-        text = result['text'].strip()
-        PHANTOM = {".", "..", "...", "Untertitel", "Untertitelung", "Vielen Dank", ""}
-        transcript = '' if text in PHANTOM else text
-    except Exception as e:
-        log.error(f"Whisper Fehler: {e}")
-
-    for p in [in_path, wav_path]:
-        try: os.remove(p)
-        except: pass
-
-    if not transcript:
-        return jsonify(transcript='', response='Ich habe dich nicht verstanden.', action=None)
-
-    remote = bool(data.get('remote', False))
     global _bmo_busy
     with _bmo_busy_lock:
         _bmo_busy = True
     try:
+        audio_bytes = base64.b64decode(b64)
+        suffix = '.wav' if fmt == 'wav' else '.webm'
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            f.write(audio_bytes)
+            in_path = f.name
+
+        wav_path = in_path.rsplit('.', 1)[0] + '_conv.wav'
+        try:
+            subprocess.run(
+                ['ffmpeg', '-y', '-i', in_path, '-ar', '16000', '-ac', '1', wav_path],
+                capture_output=True, timeout=15
+            )
+        except:
+            wav_path = in_path
+
+        transcript = ''
+        try:
+            wm     = get_whisper()
+            result = wm.transcribe(wav_path, language="de", fp16=False,
+                                   temperature=0.0, no_speech_threshold=0.7,
+                                   condition_on_previous_text=False)
+            text = result['text'].strip()
+            PHANTOM = {".", "..", "...", "Untertitel", "Untertitelung", "Vielen Dank", ""}
+            transcript = '' if text in PHANTOM else text
+        except Exception as e:
+            log.error(f"Whisper Fehler: {e}")
+
+        for p in [in_path, wav_path]:
+            try: os.remove(p)
+            except: pass
+
+        if not transcript:
+            return jsonify(transcript='', response='Ich habe dich nicht verstanden.', action=None)
+
+        remote = bool(data.get('remote', False))
         response, action, action_params = process_text(transcript, remote=remote)
         return jsonify(transcript=transcript, response=response, action=action, action_params=action_params)
     finally:
