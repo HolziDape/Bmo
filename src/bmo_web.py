@@ -1697,9 +1697,28 @@ async function updateStatus() {
     const ramBar = document.getElementById('sRamBar');
     ramBar.style.width = ram + '%';
     ramBar.className = 'bar-fill' + (ram > 90 ? ' crit' : ram > 70 ? ' warn' : '');
+
+    const readyEl = document.getElementById('bmoReady');
+    if (readyEl) {
+      if (d.lite_mode) {
+        readyEl.textContent = '· Lite-Modus';
+        readyEl.style.color = '#64748b';
+        readyEl.classList.remove('bmo-thinking');
+      } else if (d.busy) {
+        readyEl.textContent = '· Am Denken...';
+        readyEl.style.color = '#f59e0b';
+        readyEl.classList.add('bmo-thinking');
+      } else {
+        readyEl.textContent = '· Bereit';
+        readyEl.style.color = '#4ade80';
+        readyEl.classList.remove('bmo-thinking');
+      }
+    }
   } catch(e) {
     document.getElementById('coreDot').classList.add('off');
     document.getElementById('coreStatus').textContent = 'Core offline';
+    const readyEl = document.getElementById('bmoReady');
+    if (readyEl) { readyEl.textContent = ''; readyEl.classList.remove('bmo-thinking'); }
   }
 }
 updateStatus();
