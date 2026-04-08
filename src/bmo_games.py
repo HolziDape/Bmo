@@ -1,6 +1,6 @@
 """
 bmo_games.py — Mini-Spiele Blueprint (Pong Solo, Tetris, Snake, Breakout)
-Wird in bmo_web_freund.py registriert.
+Wird in bmo_web.py registriert.
 """
 import math
 import time
@@ -13,7 +13,7 @@ games_bp = Blueprint('games', __name__)
 
 
 def _check_auth():
-    """Returns True if user is authenticated (same check as login_required in bmo_web_freund)."""
+    """Returns True if user is authenticated (same check as login_required in bmo_web)."""
     return bool(_flask_session.get('authenticated'))
 
 # Aktive Spiel-Sessions: {token: {'game': str, 'start': float}}
