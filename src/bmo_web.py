@@ -28,6 +28,7 @@ log = logging.getLogger("BMO-Web")
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from bmo_games import games_bp
 import requests as req
 import psutil
 import datetime
@@ -60,6 +61,7 @@ except ImportError:
 app  = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+app.register_blueprint(games_bp)
 
 PORT       = 5000
 CORE_URL   = "http://localhost:6000"
@@ -1577,6 +1579,39 @@ HTML = """<!DOCTYPE html>
           <div style="font-size:12px;color:var(--text2);margin-top:2px;">Du vs KI · Fordere Freund heraus</div>
         </div>
       </button>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🏓</span>
+          <span style="font-weight:600;color:#4ade80;">Pong Solo</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('pong','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('pong','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('pong','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Hard</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🟩</span>
+          <span style="font-weight:600;color:#a78bfa;">Tetris</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('tetris','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('tetris','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('tetris','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Hard</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🐍</span>
+          <span style="font-weight:600;color:#f97316;">Snake</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('snake','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('snake','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('snake','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Hard</button>
+        </div>
+      </div>
     </div>
     <button class="btn-primary" onclick="closeOverlay('spieleOverlay')" style="margin-top:14px;background:var(--bg3);">Schließen</button>
   </div>
@@ -2295,6 +2330,11 @@ async function killFreundProcess(pid, btn) {
 }
 
 // ── SPIELE OVERLAY ───────────────────────────────────────────────
+function openSoloGame(name, diff) {
+  closeOverlay('spieleOverlay');
+  window.open('/games/' + name + '?diff=' + (diff || 'normal'), '_blank');
+}
+
 function showSpiele() {
   document.getElementById('spieleOverlay').classList.add('show');
 }
