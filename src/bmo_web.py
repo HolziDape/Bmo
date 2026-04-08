@@ -589,6 +589,7 @@ HTML = """<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.json">
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <title>BMO</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -3177,6 +3178,15 @@ def manifest():
         theme_color="#2b8773",
         icons=[{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml"}]
     )
+
+@app.route('/sw.js')
+def sw_js():
+    js = (
+        "self.addEventListener('install', () => self.skipWaiting());\n"
+        "self.addEventListener('activate', e => e.waitUntil(clients.claim()));\n"
+        "self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));\n"
+    )
+    return Response(js, mimetype='application/javascript')
 
 @app.route('/api/status')
 @login_required
