@@ -28,6 +28,7 @@ log = logging.getLogger("BMO-Web")
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from bmo_games import games_bp
 import requests as req
 import psutil
 import datetime
@@ -60,6 +61,7 @@ except ImportError:
 app  = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+app.register_blueprint(games_bp)
 
 PORT       = 5000
 CORE_URL   = "http://localhost:6000"
@@ -587,6 +589,7 @@ HTML = """<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.json">
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');</script>
 <title>BMO</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1152,6 +1155,8 @@ HTML = """<!DOCTYPE html>
     margin-bottom: 8px; font-variant-numeric: tabular-nums;
   }
   .pong-info { text-align: center; color: var(--text2); font-size: 13px; margin-top: 8px; }
+  @keyframes pulse-text{0%,100%{opacity:1}50%{opacity:.4}}
+  .bmo-thinking{animation:pulse-text 1.4s ease-in-out infinite;}
 </style>
 </head>
 <body>
@@ -1164,6 +1169,7 @@ HTML = """<!DOCTYPE html>
     <div>
       <h1>BMO</h1>
       <span class="sub" id="coreStatus">Verbinde...</span>
+      <span id="bmoReady" style="font-size:11px;margin-left:4px;"></span>
     </div>
   </header>
 
@@ -1574,6 +1580,39 @@ HTML = """<!DOCTYPE html>
           <div style="font-size:12px;color:var(--text2);margin-top:2px;">Du vs KI · Fordere Freund heraus</div>
         </div>
       </button>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🏓</span>
+          <span style="font-weight:600;color:#4ade80;">Pong Solo</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('pong','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('pong','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('pong','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #22c55e;border-radius:8px;color:#4ade80;cursor:pointer;">Hard</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🟩</span>
+          <span style="font-weight:600;color:#a78bfa;">Tetris</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('tetris','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('tetris','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('tetris','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #a78bfa;border-radius:8px;color:#a78bfa;cursor:pointer;">Hard</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:14px;padding:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:22px;">🐍</span>
+          <span style="font-weight:600;color:#f97316;">Snake</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openSoloGame('snake','easy')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Easy</button>
+          <button onclick="openSoloGame('snake','normal')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Normal</button>
+          <button onclick="openSoloGame('snake','hard')" style="flex:1;padding:8px;background:var(--bg3);border:1px solid #f97316;border-radius:8px;color:#f97316;cursor:pointer;">Hard</button>
+        </div>
+      </div>
     </div>
     <button class="btn-primary" onclick="closeOverlay('spieleOverlay')" style="margin-top:14px;background:var(--bg3);">Schließen</button>
   </div>
@@ -1694,9 +1733,31 @@ async function updateStatus() {
     const ramBar = document.getElementById('sRamBar');
     ramBar.style.width = ram + '%';
     ramBar.className = 'bar-fill' + (ram > 90 ? ' crit' : ram > 70 ? ' warn' : '');
+
+    const readyEl = document.getElementById('bmoReady');
+    if (readyEl) {
+      if (d.lite_mode) {
+        readyEl.textContent = '· Lite-Modus';
+        readyEl.style.color = '#94a3b8';
+        readyEl.style.textShadow = '0 1px 3px #000';
+        readyEl.classList.remove('bmo-thinking');
+      } else if (d.busy) {
+        readyEl.textContent = '· Am Denken...';
+        readyEl.style.color = '#f59e0b';
+        readyEl.style.textShadow = '';
+        readyEl.classList.add('bmo-thinking');
+      } else {
+        readyEl.textContent = '· Bereit';
+        readyEl.style.color = '#4ade80';
+        readyEl.style.textShadow = '';
+        readyEl.classList.remove('bmo-thinking');
+      }
+    }
   } catch(e) {
     document.getElementById('coreDot').classList.add('off');
     document.getElementById('coreStatus').textContent = 'Core offline';
+    const readyEl = document.getElementById('bmoReady');
+    if (readyEl) { readyEl.textContent = ''; readyEl.classList.remove('bmo-thinking'); }
   }
 }
 updateStatus();
@@ -2273,6 +2334,11 @@ async function killFreundProcess(pid, btn) {
 }
 
 // ── SPIELE OVERLAY ───────────────────────────────────────────────
+function openSoloGame(name, diff) {
+  closeOverlay('spieleOverlay');
+  window.open('/games/' + name + '?diff=' + (diff || 'normal'), '_blank');
+}
+
 function showSpiele() {
   document.getElementById('spieleOverlay').classList.add('show');
 }
@@ -3112,6 +3178,15 @@ def manifest():
         theme_color="#2b8773",
         icons=[{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml"}]
     )
+
+@app.route('/sw.js')
+def sw_js():
+    js = (
+        "self.addEventListener('install', () => self.skipWaiting());\n"
+        "self.addEventListener('activate', e => e.waitUntil(clients.claim()));\n"
+        "self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));\n"
+    )
+    return Response(js, mimetype='application/javascript')
 
 @app.route('/api/status')
 @login_required

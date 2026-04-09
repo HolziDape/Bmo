@@ -880,7 +880,7 @@ def route_status():
         gpu_mem  = _gpu_cache["mem"]
     with _bmo_busy_lock:
         busy = _bmo_busy
-    return jsonify(cpu=cpu, ram=ram, time=zeit, gpu=gpu_load, gpu_mem=gpu_mem, busy=busy)
+    return jsonify(cpu=cpu, ram=ram, time=zeit, gpu=gpu_load, gpu_mem=gpu_mem, busy=busy, lite_mode=LITE_MODE)
 
 
 @app.route('/jumpscare', methods=['POST'])
